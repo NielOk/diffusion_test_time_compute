@@ -62,7 +62,15 @@ def test3(): # Check batch_uniform_scaled_forward_diffusion function
         image = Image.fromarray(first_row)
         image.show()
 
+def test4(): # embeddings test
+    t = 1
+    shape = (8, 32, 32, 3)
+    pe = DynamicForwardDiffuser.sinusoidal_positional_embedding(t, shape)
+    print(pe.shape)
+    print(pe)
+
 if __name__ == '__main__':
     #test1()
     #test2()
-    test3()
+    #test3()
+    test4()

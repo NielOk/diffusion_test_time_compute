@@ -84,3 +84,23 @@ class DynamicForwardDiffuser:
             batch_steps[t + 1] = noisy_step
 
         return batch_steps
+    
+    def sinusoidal_positional_embedding( 
+                             t: int, # Current time step
+                             shape: Tuple[int, int, int, int] # Shape of the image (batch size, height, width, channels). Number of channels for the embedding is always 1, no matter what the image is
+                             ) -> np.ndarray:
+        '''
+        Generate a sinusoidal positional embedding for the current time 
+        step t of shape (batch size, height, width, channels). 
+        ''' 
+
+        batch_size, height, width, _ = shape
+
+        # compute a single embedding scalar for the time step `t`
+        embedding_value = np.sin(t / 10000)
+
+        # create a tensor of shape (batch size, height, width, 1) with the same value
+        embedding_tensor = np.full((batch_size, height, width, 1), embedding_value, dtype=np.float32)
+
+        return embedding_tensor
+            
