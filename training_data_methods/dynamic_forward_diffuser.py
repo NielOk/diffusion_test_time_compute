@@ -103,4 +103,21 @@ class DynamicForwardDiffuser:
         embedding_tensor = np.full((batch_size, height, width, 1), embedding_value, dtype=np.float32)
 
         return embedding_tensor
-            
+    
+    def label_embedding(
+            label_ids: np.ndarray, # The labels to embed
+            shape: Tuple[int, int, int, int] # The shape of the image tensor
+            ) -> np.ndarray:
+        '''
+        Generate a label embedding for the given label_id of shape
+        '''
+        batch_size, height, width, _ = shape
+
+        # Compute embedding values to be the label ids with float32 type
+        embedding_values = label_ids.astype(np.float32)
+
+        # Create a tensor of shape (batch_size, height, width, 1)
+        embedding_tensor = np.tile(embedding_values[:, np.newaxis, np.newaxis, np.newaxis], 
+                                (1, height, width, 1))
+
+        return embedding_tensor

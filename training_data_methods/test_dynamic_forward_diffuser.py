@@ -62,12 +62,41 @@ def test3(): # Check batch_uniform_scaled_forward_diffusion function
         image = Image.fromarray(first_row)
         image.show()
 
-def test4(): # embeddings test
+def test4(): # temporal embeddings, label embeddings and concatenation test
     t = 1
     shape = (8, 32, 32, 3)
     pe = DynamicForwardDiffuser.sinusoidal_positional_embedding(t, shape)
     print(pe.shape)
     print(pe)
+
+    generator = DynamicForwardDiffuser()
+    training_data_path = "training_data.json"
+
+    generator.load_training_data(training_data_path)
+    merged_data_list, merged_data_labels = generator.convert_data_to_neural_net_format()
+
+    merged_data_array = np.stack(merged_data_list)
+    print(merged_data_array.shape)
+
+    merged_labels_array = np.array(merged_data_labels)
+    print(merged_labels_array.shape)
+
+    batch_size = 8
+    data_batches = generator.create_batches(merged_data_array, 8)
+    label_batches = generator.create_batches(merged_labels_array, 8)
+    print(data_batches[0].shape)
+
+    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
+    le = DynamicForwardDiffuser.label_embedding(labels, shape)
+    print(le.shape)
+    print(le)
+
+    concatenated_batch_0 = np.concatenate([data_batches[0], pe], axis=-1)
+    concatenated_batch_0 = np.concatenate([concatenated_batch_0, le], axis=-1)
+
+    print(concatenated_batch_0.shape)
+    print(concatenated_batch_0)
+    print(concatenated_batch_0[0, 0, 0, -1])
 
 if __name__ == '__main__':
     #test1()
