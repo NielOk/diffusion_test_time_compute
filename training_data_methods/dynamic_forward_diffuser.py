@@ -35,7 +35,7 @@ class DynamicForwardDiffuser:
                 image_array = non_noisy_matrix.astype(np.uint8)
 
                 merged_data_list.append(image_array)
-                merged_data_labels.append(0 if shape == 'square' else 1) # 0 for square, 1 for triangle. 
+                merged_data_labels.append(0 if shape == 'squares' else 1) # 0 for squares, 1 for triangles. 
 
         return merged_data_list, merged_data_labels
 
@@ -56,7 +56,44 @@ class DynamicForwardDiffuser:
         # Use slicing to create batches
         batches = [data[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
         return batches
+    
+    def sinusoidal_positional_embedding(self,
+                             t: int, # Current time step
+                             shape: Tuple[int, int, int, int] # Shape of the image (batch size, height, width, channels). Number of channels for the embedding is always 1, no matter what the image is
+                             ) -> np.ndarray:
+        '''
+        Generate a sinusoidal positional embedding for the current time 
+        step t of shape (batch size, height, width, channels). 
+        ''' 
 
+        batch_size, height, width, _ = shape
+
+        # compute a single embedding scalar for the time step `t`
+        embedding_value = np.sin(t / 10000)
+
+        # create a tensor of shape (batch size, height, width, 1) with the same value
+        embedding_tensor = np.full((batch_size, height, width, 1), embedding_value, dtype=np.float32)
+
+        return embedding_tensor
+    
+    def label_embedding(self,
+            label_ids: np.ndarray, # The labels to embed
+            shape: Tuple[int, int, int, int] # The shape of the image tensor
+            ) -> np.ndarray:
+        '''
+        Generate a label embedding for the given label_id of shape
+        '''
+        batch_size, height, width, _ = shape
+
+        # Compute embedding values to be the label ids with float32 type
+        embedding_values = label_ids.astype(np.float32)
+
+        # Create a tensor of shape (batch_size, height, width, 1)
+        embedding_tensor = np.tile(embedding_values[:, np.newaxis, np.newaxis, np.newaxis], 
+                                (1, height, width, 1))
+
+        return embedding_tensor
+    
     def batch_uniform_scaled_forward_diffusion(self, 
                                                batch_array: np.ndarray, # Array of all non-noisy data
                                                T: int # Number of diffusion steps
@@ -85,39 +122,20 @@ class DynamicForwardDiffuser:
 
         return batch_steps
     
-    def sinusoidal_positional_embedding( 
-                             t: int, # Current time step
-                             shape: Tuple[int, int, int, int] # Shape of the image (batch size, height, width, channels). Number of channels for the embedding is always 1, no matter what the image is
-                             ) -> np.ndarray:
+    def embed_and_normalize(self, 
+                        batch_steps: Dict[int, np.ndarray], # Dictionary with the step number as the key and the batch array as the value
+                        batch_labels: np.ndarray, # Array of all labels
+                        T: int # Number of diffusion steps
+                        ) -> Dict[int, np.ndarray]: # Returns a dictionary with the step number as the key and the batch array as the value
         '''
-        Generate a sinusoidal positional embedding for the current time 
-        step t of shape (batch size, height, width, channels). 
-        ''' 
-
-        batch_size, height, width, _ = shape
-
-        # compute a single embedding scalar for the time step `t`
-        embedding_value = np.sin(t / 10000)
-
-        # create a tensor of shape (batch size, height, width, 1) with the same value
-        embedding_tensor = np.full((batch_size, height, width, 1), embedding_value, dtype=np.float32)
-
-        return embedding_tensor
-    
-    def label_embedding(
-            label_ids: np.ndarray, # The labels to embed
-            shape: Tuple[int, int, int, int] # The shape of the image tensor
-            ) -> np.ndarray:
+        Add all embeddings to the batch of diffusion steps.
         '''
-        Generate a label embedding for the given label_id of shape
-        '''
-        batch_size, height, width, _ = shape
 
-        # Compute embedding values to be the label ids with float32 type
-        embedding_values = label_ids.astype(np.float32)
+        for t in range(T):
+            normalized_batch = batch_steps[t].astype(np.float32) / 255.0
+            le = self.label_embedding(batch_labels, batch_steps[t].shape)
+            pe = self.sinusoidal_positional_embedding(t, batch_steps[t].shape)
+            batch_steps[t] = np.concatenate([normalized_batch, pe], axis=-1)
+            batch_steps[t] = np.concatenate([batch_steps[t], le], axis=-1)
 
-        # Create a tensor of shape (batch_size, height, width, 1)
-        embedding_tensor = np.tile(embedding_values[:, np.newaxis, np.newaxis, np.newaxis], 
-                                (1, height, width, 1))
-
-        return embedding_tensor
+        return batch_steps
