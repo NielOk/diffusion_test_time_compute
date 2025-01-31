@@ -105,7 +105,7 @@ def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffu
 
     for i in range(len(X_test_batches)):
 
-        # Forward diffusion on inputs to get noisy data
+        # Forward diffusion on inputs to get noisy data. The prev_step_noise of step 1 is prev_step_noise[1], is noise added at step 0
         batch_steps, prev_step_noises = generator.batch_beta_schedule_forward_diffusion(X_test_batches[i], num_diffusion_steps, beta)
 
         # Convert labels to torch tensor float
@@ -129,7 +129,7 @@ def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffu
                 output = model(model_input)
                 loss = criterion(output, prev_step_noises[key])
 
-                print(f"Loss: {loss}")
+                print(f"Step: {key}, Loss: {loss}")
 
 def visualize_model_output(model, beta, num_diffusion_steps=20):
     ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser, just for its embedding functions
@@ -154,6 +154,9 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
     image_input = original_image_input
     for diffusion_step in reversed(range(num_diffusion_steps)):
 
+        if diffusion_step == 0:
+            break # We add no noise before the zero step
+
         # Get the embeddings and normalize
         le = ForwardDiffuser.label_embedding(np.array([0]), image_input.shape)
         pe = ForwardDiffuser.sinusoidal_positional_embedding(diffusion_step, image_input.shape)
@@ -172,13 +175,13 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         image_input = (1 / np.sqrt(alpha[diffusion_step])) * (image_input - np.sqrt(1 - alpha[diffusion_step]) * predicted_noise_array)
 
         #Draw the noisy image
-        image_array = np.clip(image_input, -1, 1)
+        image_array_2 = np.clip(image_input, -1, 1)
 
         # normalize to be between 0 and 1
-        image_array = ((image_array + 1) / 2) * 255
-        image_array = image_array.squeeze().astype(np.uint8)
-        image = Image.fromarray(image_array)
-        image.show()
+        image_array_2 = ((image_array_2 + 1) / 2) * 255
+        image_array_2 = image_array_2.squeeze().astype(np.uint8)
+        image2 = Image.fromarray(image_array_2)
+        image2.show()
 
 # Example usage
 if __name__ == "__main__":
@@ -188,7 +191,7 @@ if __name__ == "__main__":
     X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path)
 
     # Define beta
-    T = 20
+    T = 100
     beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
 
     # Train model
