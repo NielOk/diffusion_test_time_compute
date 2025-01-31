@@ -54,7 +54,7 @@ def test3(): # Check batch_uniform_scaled_forward_diffusion function
     print(batches[0].shape)
 
     num_forward_diffusion_steps = 20
-    batch_steps = generator.batch_uniform_scaled_forward_diffusion(batches[0], num_forward_diffusion_steps)
+    batch_steps, prev_step_noises = generator.batch_uniform_scaled_forward_diffusion(batches[0], num_forward_diffusion_steps)
 
     # Draw the steps
     for step, batch in batch_steps.items():
@@ -86,7 +86,7 @@ def test4(): # Check batch_uniform_beta_schedule_forward_diffusion function
     T = 20
     beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
 
-    batch_steps = generator.batch_beta_schedule_forward_diffusion(batches[0], T, beta)
+    batch_steps, prev_step_noises = generator.batch_beta_schedule_forward_diffusion(batches[0], T, beta)
 
     # Draw the steps
     for step, batch in batch_steps.items():

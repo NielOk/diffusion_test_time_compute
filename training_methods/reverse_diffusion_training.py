@@ -10,6 +10,7 @@ import os
 import json
 import sys
 from PIL import Image
+from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
 TRAINING_METHODS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,24 +56,130 @@ def load_non_noisy_data(training_data_path):
 
     return X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator
 
-def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=100, learning_rate=0.001):
+def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=10, learning_rate=0.0001):
+    ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser
+
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss()
 
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs)):
+        
+        model.train() # Set model to training mode
+
         for i in range(len(X_train_batches)):
 
             # Forward diffusion on inputs to get noisy data
-            batch_steps = generator.batch_beta_schedule_forward_diffusion(X_train_batches[i], num_diffusion_steps, beta)
+            batch_steps, prev_step_noises = generator.batch_beta_schedule_forward_diffusion(X_train_batches[i], num_diffusion_steps, beta)
 
             # Convert labels to torch tensor float
             labels = torch.from_numpy(y_train_batches[i]).float()
 
-            # Convert batch steps to torch tensor floats
-            for key, value in batch_steps.items():
-                batch_steps[key] = torch.from_numpy(value).float()
+            # Get the embeddings and normalize
+            batch_steps = ForwardDiffuser.embed_and_normalize(batch_steps, y_train_batches[i], num_diffusion_steps)
 
+            # Convert batch steps to torch tensor floats, normalize, add label embedding, time step embeddings
+            for key, value in batch_steps.items():
+
+                if key != 0: # Skip the non-noisy data
+
+                    batch_steps[key] = torch.from_numpy(value).float() # Convert to torch tensor float
+
+                    prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
+                    prev_step_noises[key] = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                    
+                    model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                    
+                    output = model(model_input)
+                    loss = criterion(output, prev_step_noises[key]) # Loss calculation
+
+                    # Backpropagation
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=20):
+    ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diff
+    criterion = torch.nn.MSELoss()
+
+    model.eval() # Set model to evaluation mode
+
+    for i in range(len(X_test_batches)):
+
+        # Forward diffusion on inputs to get noisy data
+        batch_steps, prev_step_noises = generator.batch_beta_schedule_forward_diffusion(X_test_batches[i], num_diffusion_steps, beta)
+
+        # Convert labels to torch tensor float
+        labels = torch.from_numpy(y_test_batches[i]).float()
+
+        # Get the embeddings and normalize
+        batch_steps = ForwardDiffuser.embed_and_normalize(batch_steps, y_test_batches[i], num_diffusion_steps)
+
+        # Convert batch steps to torch tensor floats, normalize, add label embedding, time step embeddings
+        for key, value in batch_steps.items():
+
+            if key != 0: # Skip the non-noisy data
+
+                batch_steps[key] = torch.from_numpy(value).float() # Convert to torch tensor float
+
+                prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
+                prev_step_noises[key] = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                
+                model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+
+                output = model(model_input)
+                loss = criterion(output, prev_step_noises[key])
+
+                print(f"Loss: {loss}")
+
+def visualize_model_output(model, beta, num_diffusion_steps=20):
+    ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser, just for its embedding functions
     
+    model.eval() # Set model to evaluation mode
+
+    # Get alpha and alpha_bar
+    alpha = 1.0 - beta
+
+    original_image_input = np.random.normal(0, 1, (1, 32, 32, 3))  # Gaussian noise
+    original_image_input = np.clip(original_image_input, -1, 1)
+    original_image_input = ((original_image_input + 1) / 2)
+
+    # Show the original image
+
+    # normalize to be between 0 and 255
+    image_array = original_image_input * 255
+    image_array = image_array.squeeze().astype(np.uint8)
+    image = Image.fromarray(image_array)
+    image.show()
+
+    image_input = original_image_input
+    for diffusion_step in reversed(range(num_diffusion_steps)):
+
+        # Get the embeddings and normalize
+        le = ForwardDiffuser.label_embedding(np.array([0]), image_input.shape)
+        pe = ForwardDiffuser.sinusoidal_positional_embedding(diffusion_step, image_input.shape)
+
+        pe_concatenated_image = np.concatenate([image_input, pe], axis=-1)
+        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, pe], axis=-1)
+
+        model_input = torch.from_numpy(le_pe_concatenated_image).float().permute(0, 3, 1, 2) # Change to fit the model input shape
+
+        predicted_noise = model(model_input)
+
+        # Get predicted noise as numpy array
+        predicted_noise_array = predicted_noise.detach().numpy().squeeze().transpose(1, 2, 0)
+
+        # Get the next image
+        image_input = (1 / np.sqrt(alpha[diffusion_step])) * (image_input - np.sqrt(1 - alpha[diffusion_step]) * predicted_noise_array)
+
+        #Draw the noisy image
+        image_array = np.clip(image_input, -1, 1)
+
+        # normalize to be between 0 and 1
+        image_array = ((image_array + 1) / 2) * 255
+        image_array = image_array.squeeze().astype(np.uint8)
+        image = Image.fromarray(image_array)
+        image.show()
+
 # Example usage
 if __name__ == "__main__":
 
@@ -86,4 +193,10 @@ if __name__ == "__main__":
 
     # Train model
     model = SimpleConvNetDiffuser()
-    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=1, learning_rate=0.001)
+    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=5, learning_rate=0.001)
+
+    # Test model
+    test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=T)
+
+    # Visualize model output
+    visualize_model_output(model, beta, num_diffusion_steps=T)
