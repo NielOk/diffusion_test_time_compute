@@ -55,7 +55,7 @@ def load_non_noisy_data(training_data_path):
 
     return X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator
 
-def train_model(model, X_train_batches, y_train_batches, generator, num_diffusion_steps=20, num_epochs=100, learning_rate=0.001):
+def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=100, learning_rate=0.001):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss()
 
@@ -63,8 +63,7 @@ def train_model(model, X_train_batches, y_train_batches, generator, num_diffusio
         for i in range(len(X_train_batches)):
 
             # Forward diffusion on inputs to get noisy data
-            batch_steps = generator.batch_uniform_scaled_forward_diffusion(X_train_batches[i], 20)
-            batch_steps = generator.embed_and_normalize(batch_steps, y_train_batches[i], 20)
+            batch_steps = generator.batch_beta_schedule_forward_diffusion(X_train_batches[i], num_diffusion_steps, beta)
 
             # Convert labels to torch tensor float
             labels = torch.from_numpy(y_train_batches[i]).float()
@@ -73,7 +72,6 @@ def train_model(model, X_train_batches, y_train_batches, generator, num_diffusio
             for key, value in batch_steps.items():
                 batch_steps[key] = torch.from_numpy(value).float()
 
-            
     
 # Example usage
 if __name__ == "__main__":
@@ -82,6 +80,10 @@ if __name__ == "__main__":
     training_data_path = os.path.join(TRAINING_DATA_METHODS_DIR, 'training_data.json')
     X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path)
 
+    # Define beta
+    T = 20
+    beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
+
     # Train model
     model = SimpleConvNetDiffuser()
-    train_model(model, X_train_batches, y_train_batches, generator, num_diffusion_steps=20, num_epochs=1, learning_rate=0.001)
+    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=1, learning_rate=0.001)

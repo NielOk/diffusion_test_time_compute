@@ -62,7 +62,39 @@ def test3(): # Check batch_uniform_scaled_forward_diffusion function
         image = Image.fromarray(first_row)
         image.show()
 
-def test4(): # temporal embeddings, label embeddings and concatenation test
+def test4(): # Check batch_uniform_beta_schedule_forward_diffusion function
+    generator = DynamicForwardDiffuser()
+
+    training_data_path = "training_data.json"
+
+    generator.load_training_data(training_data_path)
+    merged_data_list, merged_data_labels = generator.convert_data_to_neural_net_format()
+
+    merged_data_array = np.stack(merged_data_list)
+    print(merged_data_array.shape)
+
+    merged_labels_array = np.array(merged_data_labels)
+    print(merged_labels_array.shape)
+
+    batch_size = 8
+    batches = generator.create_batches(merged_data_array, 8)
+    print(batches[0].shape)
+
+    T = 20
+    
+    # define beta
+    T = 20
+    beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
+
+    batch_steps = generator.batch_beta_schedule_forward_diffusion(batches[0], T, beta)
+
+    # Draw the steps
+    for step, batch in batch_steps.items():
+        first_row = batch[0]
+        image = Image.fromarray(first_row)
+        image.show()
+
+def test5(): # temporal embeddings, label embeddings and concatenation test
     t = 1
     shape = (8, 32, 32, 3)
     pe = DynamicForwardDiffuser.sinusoidal_positional_embedding(t, shape)
@@ -103,3 +135,4 @@ if __name__ == '__main__':
     #test2()
     #test3()
     test4()
+    #test5()

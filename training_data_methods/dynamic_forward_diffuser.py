@@ -109,7 +109,7 @@ class DynamicForwardDiffuser:
         batch_steps = {}
         batch_steps[0] = batch_array
 
-        for t in range(T - 1):
+        for t in range(1, T):
             noise = np.random.normal(0, (t + 1) / T, size=batch_T.shape)
             
             batch_T = batch_T + noise
@@ -120,6 +120,35 @@ class DynamicForwardDiffuser:
 
             batch_steps[t + 1] = noisy_step
 
+        return batch_steps
+    
+    def batch_beta_schedule_forward_diffusion(self,
+                                        batch_array: np.ndarray, # Array of all non-noisy data
+                                        T: int, # Number of diffusion steps
+                                        beta: np.ndarray # Beta schedule
+                                        ) -> Dict[int, np.ndarray]: # Returns a dictionary with the step number as the key and the batch array as the value
+        '''
+        Do forward diffusion with a uniform beta schedule.
+        '''
+
+        batch_T = (batch_array.astype(np.float32) / 127.5) - 1 # Scale the batch to be between -1 and 1 for forward diffusion
+
+        batch_steps = {}
+        batch_steps[0] = batch_array
+
+        alpha = 1.0 - beta
+        alpha_bar = np.cumprod(alpha)  # Cumulative product of alphas
+        
+        for t in range(1, T):
+            noise = np.random.normal(0, 1, batch_T.shape)  # Gaussian noise
+            batch_T = np.sqrt(alpha_bar[t]) * batch_T + np.sqrt(1 - alpha_bar[t]) * noise
+            batch_T = np.clip(batch_T, -1, 1)  # Clip the batch to be between -1 and 1
+
+            # Convert the batch back to a numpy array of integers
+            noisy_step = np.clip(((batch_T + 1) * 127.5).astype(np.uint8), 0, 255)  # Scale the batch back to be between 0 and 255
+
+            batch_steps[t + 1] = noisy_step
+        
         return batch_steps
     
     def embed_and_normalize(self, 

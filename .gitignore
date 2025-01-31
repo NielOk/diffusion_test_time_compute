@@ -4,3 +4,6 @@
 
 # pycache
 **__pycache__**/
+
+# Training data
+training_data_methods/training_data.json
