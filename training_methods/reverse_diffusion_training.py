@@ -1,5 +1,5 @@
 '''
-Code for reverse diffuser and training.
+Code for reverse diffuser and training, and testing modules.
 '''
 
 import numpy as np
@@ -240,30 +240,3 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         image_array_2 = image_array_2.squeeze().astype(np.uint8)
         image2 = Image.fromarray(image_array_2)
         image2.show()
-
-# Example usage
-if __name__ == "__main__":
-
-    # Load training data
-    training_data_path = os.path.join(TRAINING_DATA_METHODS_DIR, 'training_data.json')
-    X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path)
-
-    # Define beta
-    T = 150
-    beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
-
-    # Train model
-    model_save_filename = 'simple_conv_net_diffuser.pth'
-    model = SimpleConvNetDiffuser()
-    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=20, learning_rate=0.001, model_save_filename=model_save_filename)
-
-    # Load trained model 
-    trained_model = SimpleConvNetDiffuser()
-    model_save_dir = os.path.join(TRAINING_METHODS_DIR, model_save_filename)
-    trained_model.load_state_dict(torch.load(model_save_dir))
-
-    # Test model
-    test_model(trained_model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=T)
-
-    # Visualize model output
-    visualize_model_output(trained_model, beta, num_diffusion_steps=T)
