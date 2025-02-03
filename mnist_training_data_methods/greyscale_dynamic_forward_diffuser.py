@@ -1,47 +1,38 @@
 '''
-This file contains a class that generates forward diffusion training data for rgb images dynamically.
+This file contains a class that generates forward diffusion training data for greyscale images dynamically.
 '''
 
 from PIL import Image
 import numpy as np
 from typing import Tuple, Dict, List
 import json
+from torchvision import datasets
 
-class DynamicForwardDiffuser:
+class GreyscaleDynamicForwardDiffuser:
      
     def __init__(self) -> None:
-        self.non_noisy_data = None # Will be used to store the non-noisy data
+        self.non_noisy_data = None # Will be used to store the non-noisy image data
+        self.non_noisy_labels = None # Will be used to store the non-noisy image labels
 
     def load_training_data(self, 
-                        training_data_path: str,
+                        training_data_path: str, # Path to the training data
+                        shuffle: bool = True, # Whether to shuffle the data
+                        download: bool = True # Whether to download the data
                         ) -> None:
           
-        with open(training_data_path, 'r') as f:
-            self.non_noisy_data = json.load(f)   
+        mnist_pytorch = datasets.MNIST(root=training_data_path, train=True, download=download)
 
-    def convert_data_to_neural_net_format(self, 
-                                        ) -> Tuple[List[np.ndarray], List[int]]: # Features and what their label is to condition on
-        
-        '''
-        Convert the non-noisy data dict obtained from load_training_data 
-        into a tensor of image data and a tensor of labels
-        '''
-        merged_data_list = []
-        merged_data_labels = [] # label as in what the data is conditioned on
+        mnist_data = mnist_pytorch.data.numpy()
 
-        for shape, data_list in self.non_noisy_data.items():
-            for data in data_list:
-                non_noisy_matrix = np.array(data)
-                image_array = non_noisy_matrix.astype(np.uint8)
+        mnist_data = np.expand_dims(mnist_data, axis=-1) # Add a channel dimension for time and label embeddings
+        mnist_labels = mnist_pytorch.targets.numpy()
 
-                merged_data_list.append(image_array)
-                merged_data_labels.append(0 if shape == 'squares' else 1) # 0 for squares, 1 for triangles. 
-
-        return merged_data_list, merged_data_labels
+        self.non_noisy_data = mnist_data
+        self.non_noisy_labels = mnist_labels
 
     def create_batches(self, 
-                    data: np.ndarray, # Array of all non-noisy data
-                    batch_size: int # Size of each batch
+                    batch_size: int, # Size of each batch
+                    shuffle: bool = True # Whether to shuffle the data
                     ) -> List[np.ndarray]:
                 
         '''
@@ -49,13 +40,25 @@ class DynamicForwardDiffuser:
         features and labels (the batch size should be the same for both 
         for separate datasets).
         '''
-        num_samples = data.shape[0]
-        # Compute the number of batches
+        num_samples = self.non_noisy_data.shape[0]
+
+        # get number of batches
         num_batches = int(np.ceil(num_samples / batch_size))
+
+        data = self.non_noisy_data
+        labels = self.non_noisy_labels
+
+        if shuffle:
+            indices = np.arange(num_samples)
+            np.random.shuffle(indices)
+            data = data[indices]
+            labels = labels[indices]
         
         # Use slicing to create batches
-        batches = [data[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
-        return batches
+        data_batches = [data[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
+        label_batches = [labels[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
+        
+        return data_batches, label_batches
     
     def sinusoidal_positional_embedding(self,
                              t: int, # Current time step

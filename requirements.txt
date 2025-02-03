@@ -1,6 +1,7 @@
 numpy
 pillow
 torch
+torchvision
 scikit-learn
 tqdm
 matplotlib

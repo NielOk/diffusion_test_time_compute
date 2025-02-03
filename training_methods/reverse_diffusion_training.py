@@ -227,7 +227,9 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         pe = ForwardDiffuser.sinusoidal_positional_embedding(diffusion_step, image_input.shape)
 
         pe_concatenated_image = np.concatenate([image_input, pe], axis=-1)
-        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, pe], axis=-1)
+        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, le], axis=-1)
+
+        print(le_pe_concatenated_image)
 
         model_input = torch.from_numpy(le_pe_concatenated_image).float().permute(0, 3, 1, 2) # Change to fit the model input shape
 
