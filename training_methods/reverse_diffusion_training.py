@@ -35,6 +35,62 @@ class SimpleConvNetDiffuser(nn.Module):
         x = self.conv3(x)
         return x
     
+# Improved convolutional network for reverse diffusion
+class ImprovedDiffuser(nn.Module):
+    def __init__(self, in_channels=5, out_channels=3, base_channels=64):
+        super(ImprovedDiffuser, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels, base_channels, kernel_size=3, padding=1)
+        self.norm1 = nn.BatchNorm2d(base_channels)  # Normalize activations
+        self.conv2 = nn.Conv2d(base_channels, base_channels, kernel_size=3, padding=1)
+        self.norm2 = nn.BatchNorm2d(base_channels)
+        self.conv3 = nn.Conv2d(base_channels, out_channels, kernel_size=3, padding=1)
+
+        self.relu = nn.ReLU()
+
+        # Residual connection
+        self.residual = nn.Conv2d(in_channels, out_channels, kernel_size=1)  
+
+    def forward(self, x):
+        res = self.residual(x)  # Shortcut
+        x = self.relu(self.norm1(self.conv1(x)))
+        x = self.relu(self.norm2(self.conv2(x)))
+        x = self.conv3(x)
+        return x + res  # Add residual connection
+    
+import torch.nn.functional as F
+
+class UNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        return self.conv(x)
+
+# Simple UNet
+class SimpleUNet(nn.Module):
+    def __init__(self, in_channels=5, out_channels=3, base_channels=64):
+        super().__init__()
+        self.enc1 = UNetBlock(in_channels, base_channels)
+        self.enc2 = UNetBlock(base_channels, base_channels * 2)
+        self.dec2 = UNetBlock(base_channels * 2, base_channels)
+        self.dec1 = nn.Conv2d(base_channels, out_channels, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        e1 = self.enc1(x)
+        e2 = self.enc2(F.max_pool2d(e1, kernel_size=2))
+        d2 = self.dec2(F.interpolate(e2, scale_factor=2))
+        d1 = self.dec1(d2 + e1)  # Skip connection
+        return d1
+    
 def load_non_noisy_data(training_data_path):
     generator = DynamicForwardDiffuser()
 
@@ -48,7 +104,7 @@ def load_non_noisy_data(training_data_path):
     # Train test split
     X_train, X_test, y_train, y_test = train_test_split(merged_data_array, merged_labels_array, test_size=0.2, random_state=42)
 
-    batch_size = 8
+    batch_size = 4
     X_train_batches = generator.create_batches(np.array(X_train), batch_size)
     X_test_batches = generator.create_batches(np.array(X_test), batch_size)
     y_train_batches = generator.create_batches(np.array(y_train), batch_size)
@@ -56,7 +112,7 @@ def load_non_noisy_data(training_data_path):
 
     return X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator
 
-def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=10, learning_rate=0.0001):
+def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=10, learning_rate=0.0001, model_save_filename='simple_conv_net_diffuser.pth'):
     ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -96,6 +152,8 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
+        
+        torch.save(model.state_dict(), os.path.join(TRAINING_METHODS_DIR, model_save_filename)) # Save model after each epoch
 
 def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=20):
     ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diff
@@ -191,15 +249,21 @@ if __name__ == "__main__":
     X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path)
 
     # Define beta
-    T = 100
+    T = 150
     beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
 
     # Train model
+    model_save_filename = 'simple_conv_net_diffuser.pth'
     model = SimpleConvNetDiffuser()
-    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=5, learning_rate=0.001)
+    train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=20, learning_rate=0.001, model_save_filename=model_save_filename)
+
+    # Load trained model 
+    trained_model = SimpleConvNetDiffuser()
+    model_save_dir = os.path.join(TRAINING_METHODS_DIR, model_save_filename)
+    trained_model.load_state_dict(torch.load(model_save_dir))
 
     # Test model
-    test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=T)
+    test_model(trained_model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=T)
 
     # Visualize model output
-    visualize_model_output(model, beta, num_diffusion_steps=T)
+    visualize_model_output(trained_model, beta, num_diffusion_steps=T)
