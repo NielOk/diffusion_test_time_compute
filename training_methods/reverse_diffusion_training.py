@@ -112,6 +112,14 @@ def load_non_noisy_data(training_data_path):
 
     return X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator
 
+def cosine_beta_schedule(T, s=0.008):
+    t = np.linspace(0, T, T + 1, dtype=np.float64)  # Time indices from 0 to T
+    f = np.cos(((t / T + s) / (1 + s)) * (np.pi / 2)) ** 2
+    alpha_bar = f / f[0]  # Normalize so that alpha_bar starts at 1
+    betas = 1 - alpha_bar[1:] / alpha_bar[:-1]  # Compute beta_t values
+    
+    return np.clip(betas, 0.0001, 0.9999)  # Avoid extreme values
+
 def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=10, learning_rate=0.0001, model_save_filename='simple_conv_net_diffuser.pth'):
     ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser
 

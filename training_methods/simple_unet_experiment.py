@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 
-from reverse_diffusion_training import SimpleUNet, load_non_noisy_data,train_model, test_model, visualize_model_output
+from reverse_diffusion_training import SimpleUNet, load_non_noisy_data, cosine_beta_schedule, train_model, test_model, visualize_model_output
 
 TRAINING_METHODS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(TRAINING_METHODS_DIR)
@@ -15,7 +15,7 @@ def simple_unet_experiment():
 
     # Define beta
     T = 100
-    beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
+    beta = cosine_beta_schedule(T, s=0.008)
 
     # Train model
     model_save_filename = 'simple_unet.pth'
