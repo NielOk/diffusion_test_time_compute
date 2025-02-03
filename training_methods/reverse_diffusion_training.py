@@ -202,9 +202,9 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
 
     # Get alpha and alpha_bar
     alpha = 1.0 - beta
-    alpha_bar = np.cumprod(alpha)  # Cumulative product of alphas
+    alpha_bar = np.cumprod(alpha)
 
-    original_image_input = np.random.randn(32, 32, 3) # Random image input
+    original_image_input = np.random.randn(1, 32, 32, 3)  # Gaussian noise
     original_image_input = np.clip(original_image_input, -1, 1)
     original_image_input = ((original_image_input + 1) / 2)
 
@@ -213,9 +213,8 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
     # normalize to be between 0 and 255
     image_array = original_image_input * 255
     image_array = image_array.squeeze().astype(np.uint8)
-    
-    plt.figure()
-    plt.imshow(image_array)
+    image = Image.fromarray(image_array)
+    image.show()
 
     image_input = original_image_input
     for diffusion_step in reversed(range(num_diffusion_steps)):
@@ -223,17 +222,12 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         if diffusion_step == 0:
             break # We add no noise before the zero step
 
-        # Get the embeddings and normalize 
+        # Get the embeddings and normalize
         le = ForwardDiffuser.label_embedding(np.array([0]), image_input.shape)
-        print(le.shape)
         pe = ForwardDiffuser.sinusoidal_positional_embedding(diffusion_step, image_input.shape)
-        print(pe.shape)
 
         pe_concatenated_image = np.concatenate([image_input, pe], axis=-1)
-        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, le], axis=-1)
-
-        # Reshape to (1, 32, 32, 3)
-        le_pe_concatenated_image = np.expand_dims(le_pe_concatenated_image, axis=0)
+        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, pe], axis=-1)
 
         model_input = torch.from_numpy(le_pe_concatenated_image).float().permute(0, 3, 1, 2) # Change to fit the model input shape
 
@@ -251,8 +245,5 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         # normalize to be between 0 and 1
         image_array_2 = ((image_array_2 + 1) / 2) * 255
         image_array_2 = image_array_2.squeeze().astype(np.uint8)
-        
-        plt.figure()
-        plt.imshow(image_array_2)
-    
-    plt.show()
+        image2 = Image.fromarray(image_array_2)
+        image2.show()
