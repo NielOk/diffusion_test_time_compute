@@ -2,13 +2,13 @@ import os
 import numpy as np
 import torch
 
-from reverse_diffusion_training import ImprovedDiffuser, load_non_noisy_data,train_model, test_model, visualize_model_output
+from reverse_diffusion_training import SimpleUNet, load_non_noisy_data,train_model, test_model, visualize_model_output
 
 TRAINING_METHODS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(TRAINING_METHODS_DIR)
 TRAINING_DATA_METHODS_DIR = os.path.join(REPO_DIR, 'training_data_methods')
 
-def improved_diffuser_experiment():
+def simple_unet_experiment():
     # Load training data
     training_data_path = os.path.join(TRAINING_DATA_METHODS_DIR, 'training_data.json')
     X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path)
@@ -18,12 +18,12 @@ def improved_diffuser_experiment():
     beta = np.linspace(0.0001, 0.02, T)  # Uniform beta schedule
 
     # Train model
-    model_save_filename = 'improved_diffuser.pth'
-    model = ImprovedDiffuser()
+    model_save_filename = 'simple_unet.pth'
+    model = SimpleUNet()
     train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=T, num_epochs=2, learning_rate=0.001, model_save_filename=model_save_filename)
 
     # Load trained model
-    trained_model = ImprovedDiffuser()
+    trained_model = SimpleUNet()
     model_save_dir = os.path.join(TRAINING_METHODS_DIR, model_save_filename)
     trained_model.load_state_dict(torch.load(model_save_dir))
 
@@ -34,4 +34,4 @@ def improved_diffuser_experiment():
     visualize_model_output(trained_model, beta, num_diffusion_steps=T)
 
 if __name__ == '__main__':
-    improved_diffuser_experiment()
+    simple_unet_experiment()
