@@ -12,6 +12,7 @@ import sys
 from PIL import Image
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 TRAINING_METHODS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(TRAINING_METHODS_DIR)
@@ -118,7 +119,7 @@ def cosine_beta_schedule(T, s=0.008):
     alpha_bar = f / f[0]  # Normalize so that alpha_bar starts at 1
     betas = 1 - alpha_bar[1:] / alpha_bar[:-1]  # Compute beta_t values
     
-    return np.clip(betas, 0.0001, 0.9999)  # Avoid extreme values
+    return np.clip(betas, 0.0001, 0.9999)  # Avoid extreme values. Is this right for cosine beta schedule
 
 def train_model(model, X_train_batches, y_train_batches, generator, beta, num_diffusion_steps=20, num_epochs=10, learning_rate=0.0001, model_save_filename='simple_conv_net_diffuser.pth'):
     ForwardDiffuser = DynamicForwardDiffuser() # Set up the dynamic forward diffuser
@@ -135,9 +136,6 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
             # Forward diffusion on inputs to get noisy data
             batch_steps, prev_step_noises = generator.batch_beta_schedule_forward_diffusion(X_train_batches[i], num_diffusion_steps, beta)
 
-            # Convert labels to torch tensor float
-            labels = torch.from_numpy(y_train_batches[i]).float()
-
             # Get the embeddings and normalize
             batch_steps = ForwardDiffuser.embed_and_normalize(batch_steps, y_train_batches[i], num_diffusion_steps)
 
@@ -149,12 +147,12 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
                     batch_steps[key] = torch.from_numpy(value).float() # Convert to torch tensor float
 
                     prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
-                    prev_step_noises[key] = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                    added_noise = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
                     
                     model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
                     
                     output = model(model_input)
-                    loss = criterion(output, prev_step_noises[key]) # Loss calculation
+                    loss = criterion(output, added_noise) # Loss calculation
 
                     # Backpropagation
                     optimizer.zero_grad()
@@ -188,12 +186,12 @@ def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffu
                 batch_steps[key] = torch.from_numpy(value).float() # Convert to torch tensor float
 
                 prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
-                prev_step_noises[key] = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                added_noise = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
                 
                 model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
 
                 output = model(model_input)
-                loss = criterion(output, prev_step_noises[key])
+                loss = criterion(output, added_noise) # Loss calculation
 
                 print(f"Step: {key}, Loss: {loss}")
 
@@ -204,8 +202,9 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
 
     # Get alpha and alpha_bar
     alpha = 1.0 - beta
+    alpha_bar = np.cumprod(alpha)  # Cumulative product of alphas
 
-    original_image_input = np.random.normal(0, 1, (1, 32, 32, 3))  # Gaussian noise
+    original_image_input = np.random.randn(32, 32, 3) # Random image input
     original_image_input = np.clip(original_image_input, -1, 1)
     original_image_input = ((original_image_input + 1) / 2)
 
@@ -214,8 +213,9 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
     # normalize to be between 0 and 255
     image_array = original_image_input * 255
     image_array = image_array.squeeze().astype(np.uint8)
-    image = Image.fromarray(image_array)
-    image.show()
+    
+    plt.figure()
+    plt.imshow(image_array)
 
     image_input = original_image_input
     for diffusion_step in reversed(range(num_diffusion_steps)):
@@ -223,12 +223,17 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         if diffusion_step == 0:
             break # We add no noise before the zero step
 
-        # Get the embeddings and normalize
+        # Get the embeddings and normalize 
         le = ForwardDiffuser.label_embedding(np.array([0]), image_input.shape)
+        print(le.shape)
         pe = ForwardDiffuser.sinusoidal_positional_embedding(diffusion_step, image_input.shape)
+        print(pe.shape)
 
         pe_concatenated_image = np.concatenate([image_input, pe], axis=-1)
-        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, pe], axis=-1)
+        le_pe_concatenated_image = np.concatenate([pe_concatenated_image, le], axis=-1)
+
+        # Reshape to (1, 32, 32, 3)
+        le_pe_concatenated_image = np.expand_dims(le_pe_concatenated_image, axis=0)
 
         model_input = torch.from_numpy(le_pe_concatenated_image).float().permute(0, 3, 1, 2) # Change to fit the model input shape
 
@@ -238,7 +243,7 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         predicted_noise_array = predicted_noise.detach().numpy().squeeze().transpose(1, 2, 0)
 
         # Get the next image
-        image_input = (1 / np.sqrt(alpha[diffusion_step])) * (image_input - np.sqrt(1 - alpha[diffusion_step]) * predicted_noise_array)
+        image_input = (1 / np.sqrt(alpha_bar[diffusion_step])) * (image_input - np.sqrt(1 - alpha_bar[diffusion_step]) * predicted_noise_array)
 
         #Draw the noisy image
         image_array_2 = np.clip(image_input, -1, 1)
@@ -246,5 +251,8 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         # normalize to be between 0 and 1
         image_array_2 = ((image_array_2 + 1) / 2) * 255
         image_array_2 = image_array_2.squeeze().astype(np.uint8)
-        image2 = Image.fromarray(image_array_2)
-        image2.show()
+        
+        plt.figure()
+        plt.imshow(image_array_2)
+    
+    plt.show()

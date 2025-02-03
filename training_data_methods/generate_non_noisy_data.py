@@ -10,7 +10,7 @@ from non_noisy_data_generator import NonNoisyDataGenerator
 
 if __name__ == '__main__':
     generator = NonNoisyDataGenerator()
-    num_images = 1000
+    num_images = 5000
     save_path = "training_data.json"
 
     generator.generate_training_data(num_images, save_path)

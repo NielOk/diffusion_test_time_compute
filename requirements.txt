@@ -3,3 +3,4 @@ pillow
 torch
 scikit-learn
 tqdm
+matplotlib
