@@ -31,6 +31,8 @@ class GreyscaleDynamicForwardDiffuser:
         self.non_noisy_labels = mnist_labels
 
     def create_batches(self, 
+                    x_data: np.ndarray, # The data to create batches from
+                    y_data: np.ndarray, # The labels to create batches from
                     batch_size: int, # Size of each batch
                     shuffle: bool = True # Whether to shuffle the data
                     ) -> List[np.ndarray]:
@@ -40,23 +42,16 @@ class GreyscaleDynamicForwardDiffuser:
         features and labels (the batch size should be the same for both 
         for separate datasets).
         '''
-        num_samples = self.non_noisy_data.shape[0]
-
-        # get number of batches
-        num_batches = int(np.ceil(num_samples / batch_size))
-
-        data = self.non_noisy_data
-        labels = self.non_noisy_labels
+        num_samples = x_data.shape[0]
 
         if shuffle:
             indices = np.arange(num_samples)
             np.random.shuffle(indices)
-            data = data[indices]
-            labels = labels[indices]
+            x_data, y_data = x_data[indices], y_data[indices]
         
-        # Use slicing to create batches
-        data_batches = [data[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
-        label_batches = [labels[i * batch_size:(i + 1) * batch_size] for i in range(num_batches)]
+        # Split data into batches
+        data_batches = np.array_split(x_data, np.ceil(num_samples / batch_size))
+        label_batches = np.array_split(y_data, np.ceil(num_samples / batch_size))
         
         return data_batches, label_batches
     
