@@ -117,7 +117,8 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
     ForwardDiffuser = GreyscaleDynamicForwardDiffuser() # Set up the dynamic forward diffuser
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    criterion = torch.nn.MSELoss() # Try KL divergence loss next. 
+    criterion1 = torch.nn.MSELoss()
+    criterion2 = torch.nn.L1Loss()
 
     for epoch in tqdm(range(num_epochs)):
         
@@ -141,11 +142,13 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
                     prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
 
                     added_noise = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
-                    
                     model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
-                    
                     output = model(model_input)
-                    loss = criterion(output, added_noise) # Loss calculation
+
+                    mse_loss = criterion1(output, added_noise) # Loss calculation
+                    l1_loss = criterion2(output, added_noise) # Loss calculation
+
+                    loss = 0.5 * mse_loss + 0.5 * l1_loss
 
                     # Backpropagation
                     optimizer.zero_grad()
@@ -156,7 +159,8 @@ def train_model(model, X_train_batches, y_train_batches, generator, beta, num_di
 
 def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffusion_steps=20):
     ForwardDiffuser = GreyscaleDynamicForwardDiffuser() # Set up the dynamic forward diff
-    criterion = torch.nn.MSELoss()
+    criterion1 = torch.nn.MSELoss()
+    criterion2 = torch.nn.L1Loss()
 
     model.eval() # Set model to evaluation mode
 
@@ -179,12 +183,15 @@ def test_model(model, X_test_batches, y_test_batches, generator, beta, num_diffu
                 batch_steps[key] = torch.from_numpy(value).float() # Convert to torch tensor float
 
                 prev_step_noises[key] = torch.from_numpy(prev_step_noises[key]).float()
-                added_noise = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
-                
-                model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
 
+                added_noise = prev_step_noises[key].permute(0, 3, 1, 2) # Change to fit the model input shape
+                model_input = batch_steps[key].permute(0, 3, 1, 2) # Change to fit the model input shape
                 output = model(model_input)
-                loss = criterion(output, added_noise) # Loss calculation
+
+                mse_loss = criterion1(output, added_noise) # Loss calculation for mse
+                l1_loss = criterion2(output, added_noise) # Loss calculation for l1
+
+                loss = 0.5 * mse_loss + 0.5 * l1_loss
 
                 print(f"Step: {key}, Loss: {loss}")
 
