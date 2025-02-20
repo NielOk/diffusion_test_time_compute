@@ -36,5 +36,29 @@ def simple_conv_net_diffuser_experiment():
     # Visualize model output
     visualize_model_output(trained_model, betas, num_diffusion_steps=T)
 
+def test_trained_model():
+    # Load training data
+    training_data_path = os.path.join(TRAINING_DATA_METHODS_DIR, 'data')
+
+    batch_size = 6
+    X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path, batch_size=batch_size)
+
+    # Define beta
+    T = 10
+    betas = cosine_beta_schedule(T, s=0.008)
+
+    # Load trained model 
+    model_save_filename = 'simple_conv_net_diffuser.pth'
+    trained_model = SimpleConvNetDiffuser()
+    model_save_dir = os.path.join(TRAINING_METHODS_DIR, model_save_filename)
+    trained_model.load_state_dict(torch.load(model_save_dir))
+
+    # Test model
+    #test_model(trained_model, X_test_batches, y_test_batches, generator, betas, num_diffusion_steps=T)
+
+    # Visualize model output
+    visualize_model_output(trained_model, betas, num_diffusion_steps=T)
+
 if __name__ == '__main__':
-    simple_conv_net_diffuser_experiment()
+    #simple_conv_net_diffuser_experiment()
+    test_trained_model()

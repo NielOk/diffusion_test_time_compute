@@ -204,7 +204,7 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
     alpha = 1.0 - beta
     alpha_bar = np.cumprod(alpha)
 
-    original_image_input = np.random.randn(1, 32, 32, 3)  # Gaussian noise
+    original_image_input = np.random.randn(1, 32, 32, 1)  # Gaussian noise
     original_image_input = np.clip(original_image_input, -1, 1)
     original_image_input = ((original_image_input + 1) / 2)
 
@@ -217,6 +217,7 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
     image.show()
 
     image_input = original_image_input
+
     for diffusion_step in reversed(range(num_diffusion_steps)):
 
         if diffusion_step == 0:
@@ -229,14 +230,12 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
         pe_concatenated_image = np.concatenate([image_input, pe], axis=-1)
         le_pe_concatenated_image = np.concatenate([pe_concatenated_image, le], axis=-1)
 
-        print(le_pe_concatenated_image)
-
         model_input = torch.from_numpy(le_pe_concatenated_image).float().permute(0, 3, 1, 2) # Change to fit the model input shape
 
         predicted_noise = model(model_input)
 
         # Get predicted noise as numpy array
-        predicted_noise_array = predicted_noise.detach().numpy().squeeze().transpose(1, 2, 0)
+        predicted_noise_array = predicted_noise.squeeze(0).permute(1, 2, 0).detach().numpy()
 
         # Get the next image
         image_input = (1 / np.sqrt(alpha_bar[diffusion_step])) * (image_input - np.sqrt(1 - alpha_bar[diffusion_step]) * predicted_noise_array)
