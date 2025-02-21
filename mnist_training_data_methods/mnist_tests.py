@@ -24,9 +24,9 @@ def run_mnist_tests():
 
     # Create batches
     batch_size = 10
-    data_batches, label_batches = ForwardDiffuser.create_batches(batch_size, shuffle=True)
+    data_batches, label_batches = ForwardDiffuser.create_batches(ForwardDiffuser.non_noisy_data, ForwardDiffuser.non_noisy_labels, batch_size, shuffle=True)
 
-    T = 50 # num diffusion steps
+    T = 10 # num diffusion steps
     betas = cosine_beta_schedule(T, s=0.008)
 
     cur_batch = data_batches[0]
