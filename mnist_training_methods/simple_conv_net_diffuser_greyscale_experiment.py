@@ -12,9 +12,11 @@ TRAINING_DATA_METHODS_DIR = os.path.join(REPO_DIR, 'mnist_training_data_methods'
 def train_experiment():
     # Load training data
     training_data_path = os.path.join(TRAINING_DATA_METHODS_DIR, 'data')
+    if not os.path.exists(training_data_path):
+        os.makedirs(training_data_path)
 
     batch_size = 6
-    X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path, batch_size=batch_size)
+    X_train_batches, X_test_batches, y_train_batches, y_test_batches, generator = load_non_noisy_data(training_data_path, batch_size=batch_size, download=True)
 
     # Define beta
     T = 30
@@ -49,5 +51,5 @@ def test_trained_model():
     visualize_model_output(trained_model, betas, num_diffusion_steps=T)
 
 if __name__ == '__main__':
-    #train_experiment()
-    test_trained_model()
+    train_experiment()
+    #test_trained_model()
