@@ -92,10 +92,10 @@ class SimpleUNet(nn.Module):
         d1 = self.dec1(d2 + e1)  # Skip connection
         return d1
     
-def load_non_noisy_data(training_data_path, batch_size=4):
+def load_non_noisy_data(training_data_path, batch_size=4, download=False):
     generator = GreyscaleDynamicForwardDiffuser()
 
-    generator.load_training_data(training_data_path, shuffle=True, download=False)
+    generator.load_training_data(training_data_path, shuffle=True, download=download)
 
     # Train test split
     X_train, X_test, y_train, y_test = train_test_split(generator.non_noisy_data, generator.non_noisy_labels, test_size=0.2, random_state=42)
@@ -206,7 +206,7 @@ def visualize_model_output(model, beta, num_diffusion_steps=20):
 
     original_image_input = np.random.randn(1, 32, 32, 1)  # Gaussian noise
     original_image_input = np.clip(original_image_input, -1, 1)
-    original_image_input = ((original_image_input + 1) / 2)
+    original_image_input = ((original_image_input + 1) / 2) # Normalize to be between 0 and 1
 
     # Show the original image
 
