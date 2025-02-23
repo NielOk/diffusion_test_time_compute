@@ -1,8 +1,8 @@
-numpy
-pillow
-torch
-torchvision
-scikit-learn
-tqdm
-matplotlib
-python-dotenv
+numpy==2.2.2
+pillow==11.1.0
+torch==2.6.0
+torchvision==0.21.0
+scikit-learn==1.6.1
+tqdm==4.67.1
+matplotlib==3.10.0
+python-dotenv==1.0.1
