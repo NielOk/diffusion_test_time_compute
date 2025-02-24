@@ -37,11 +37,13 @@ if [[ $SSH_CONNECT_2 == "y" ]]; then
     # Set up virtual environment
     echo "Setting up virtual environment..."
     ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "python3 -m venv .venv"
-    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "source .venv/bin/activate"
     echo "Virtual environment setup complete"
 
-    # SSH into the instance and install the requirements
-    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "pip install -r requirements.txt"
+    echo "Setting up virtual environment and installing requirements..."
+ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << "EOF"
+    source .venv/bin/activate
+    pip install -r requirements.txt
+EOF
     echo "Requirements installation complete"
 else
     echo "Skipping requirements installation"
@@ -53,8 +55,10 @@ if [[ $SSH_CONNECT_3 == "y" ]]; then
 
     # SSH into the instance and run the training script
     echo "Running training script..."
-    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "source .venv/bin/activate"
-    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "python3 train_mnist.py"
+ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << "EOF"
+    source .venv/bin/activate
+    python3 train_mnist.py
+EOF
 else
     echo "Skipping training script execution"
 fi
