@@ -10,3 +10,6 @@ training_data_methods/training_data.json
 
 # API Keys
 .env
+
+# Trained models
+trained_ddpm/
