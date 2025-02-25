@@ -16,10 +16,10 @@ TRAINING_SCRIPT_PATH="./train_mnist.py"
 REQUIREMENTS_PATH="./requirements.txt"
 UTILS_PATH="./utils.py"
 
-read -p "Would you like to ssh into the instance to first copy the inference scripts to the cluster? [y/n]: " SSH_CONNECT_1
+read -p "Would you like to ssh into the instance to first copy the gpu-accelerated training scripts to the cluster? [y/n]: " SSH_CONNECT_1
 if [[ $SSH_CONNECT_1 == "y" ]]; then
 
-    # SSH into the instance and copy the inference scripts
+    # SSH into the instance and copy the training scripts
     echo "Connecting to SSH..."
     scp -i "$private_ssh_key" $MODEL_DEFINITION_PATH "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
     scp -i "$private_ssh_key" $UNET_ARCHITECTURE_PATH "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
@@ -31,7 +31,7 @@ else
 fi
 
 # Install requirements
-read -p "Would you like to ssh into the instance to install the requirements for the benchmark? [y/n]: " SSH_CONNECT_2
+read -p "Would you like to ssh into the instance to install the requirements for training? [y/n]: " SSH_CONNECT_2
 if [[ $SSH_CONNECT_2 == "y" ]]; then
 
     # Set up virtual environment
@@ -40,7 +40,7 @@ if [[ $SSH_CONNECT_2 == "y" ]]; then
     echo "Virtual environment setup complete"
 
     echo "Setting up virtual environment and installing requirements..."
-ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << "EOF"
+ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << EOF
     source .venv/bin/activate
     pip install -r requirements.txt
 EOF
@@ -53,12 +53,11 @@ fi
 read -p "Would you like to ssh into the instance to run the training script? [y/n]: " SSH_CONNECT_3
 if [[ $SSH_CONNECT_3 == "y" ]]; then
 
-    # SSH into the instance and run the training script
+    # SSH into the instance and run the training script in the background
     echo "Running training script..."
-ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << "EOF"
-    source .venv/bin/activate
-    python3 train_mnist.py
-EOF
+    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "nohup bash -c 'source .venv/bin/activate && python train_mnist.py' > train.log 2>&1 &" &
+
+    echo "Training script is running in the background on the remote server."
 else
     echo "Skipping training script execution"
 fi

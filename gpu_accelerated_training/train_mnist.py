@@ -99,11 +99,11 @@ def main(args):
                 "model_ema":model_ema.state_dict()}
 
         os.makedirs("results",exist_ok=True)
-        torch.save(ckpt,"results/steps_{:0>8}.pt".format(global_steps))
+        torch.save(ckpt,"results/epoch_{:0>3}_steps_{:0>8}.pt".format(i + 1, global_steps))
 
         model_ema.eval()
         samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device)
-        save_image(samples,"results/steps_{:0>8}.png".format(global_steps),nrow=int(math.sqrt(args.n_samples)))
+        save_image(samples,"results/epoch_{:0>3}_steps_{:0>8}.png".format(i + 1, global_steps),nrow=int(math.sqrt(args.n_samples)))
 
 if __name__=="__main__":
     args=parse_args()
