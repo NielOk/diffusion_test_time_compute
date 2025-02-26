@@ -42,7 +42,8 @@ def test_models(
         print(f'Testing model at epoch {epoch_number}')
 
         model_evals[epoch_number] = {'model_path': model_path, 
-                                     'losses': []}
+                                     'model_losses': [],
+                                     'model_ema_losses': []}
 
         if epoch_number < min_epoch: 
             continue
@@ -52,12 +53,13 @@ def test_models(
                 in_channels=1,
                 base_dim=64,
                 dim_mults=[2,4]).to(device)
-        if device == "cpu":
-            checkpoint = torch.load(model_path, map_location=torch.device("cpu"))
-            model.load_state_dict(checkpoint['model'])
-        elif device == "cuda":
-            checkpoint = torch.load(model_path)
-            model.load_state_dict(checkpoint['model'])
+        
+        model_ema=ExponentialMovingAverage(model, decay=0.995, device=device)
+        
+        # Load model
+        checkpoint = torch.load(model_path, map_location=torch.device(device))
+        model.load_state_dict(checkpoint['model'])
+        model_ema.load_state_dict(checkpoint['model_ema'])
 
         # Test model
         model.eval()
@@ -65,14 +67,18 @@ def test_models(
         for i, (image, target) in enumerate(test_loader):
             image = image.to(device)
             target = target.to(device)
-            with torch.no_grad():
-                noise = torch.randn_like(image)
-                pred_noise = model(image, noise)
-                loss = loss_fn(pred_noise, noise)
-                model_evals[epoch_number]['losses'].append(loss.item())
+            noise = torch.randn_like(image).to(device)
+            pred_noise = model(image, noise)
+            loss = loss_fn(pred_noise, noise)
+            model_evals[epoch_number]['model_losses'].append(loss.item())
+
+            ema_pred_noise = model_ema(image, noise)
+            ema_loss = loss_fn(ema_pred_noise, noise)
+            model_evals[epoch_number]['model_ema_losses'].append(ema_loss.item())
 
         # Save results
-        with open(results_filename, 'w') as f:
+        results_filepath = os.path.join(REPO_DIR, results_filename)
+        with open(results_filepath, 'w') as f:
             json.dump(model_evals, f)
 
 def analyze_eval_data(
@@ -81,11 +87,11 @@ def analyze_eval_data(
     pass
     
 if __name__ == '__main__':
-    min_epoch = 1
+    min_epoch = 99
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     results_filename = 'results.json'
     
     # Collect eval data
-    test_models(min_epoch=min_epoch, device=device)
+    test_models(min_epoch=min_epoch, device=device, results_filename=results_filename)
 
     # Analyze eval data

@@ -27,6 +27,25 @@ else
     echo "Skipping files copy into the cluster"
 fi
 
+# Install requirements
+read -p "Would you like to ssh into the instance to install the requirements for model testing? [y/n]: " SSH_CONNECT_2
+if [[ $SSH_CONNECT_2 == "y" ]]; then
+
+    # Set up virtual environment
+    echo "Setting up virtual environment..."
+    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" "python3 -m venv .venv"
+    echo "Virtual environment setup complete"
+
+    echo "Setting up virtual environment and installing requirements..."
+    ssh -i "$private_ssh_key" "$remote_ssh_user@$remote_ssh_host" << EOF
+    source .venv/bin/activate
+    pip install -r gpu_accelerated_training/requirements.txt
+EOF
+    echo "Requirements installation complete"
+else
+    echo "Skipping requirements installation"
+fi
+
 # Run the model testing script
 read -p "Would you like to ssh into the instance to run the model testing script? [y/n]: " SSH_CONNECT_2
 if [[ $SSH_CONNECT_2 == "y" ]]; then
