@@ -57,6 +57,7 @@ def main(args):
     model=MNISTDiffusion(timesteps=args.timesteps,
                 image_size=28,
                 in_channels=1,
+                num_classes=10,
                 base_dim=args.model_base_dim,
                 dim_mults=[2,4]).to(device)
 
@@ -83,7 +84,8 @@ def main(args):
         for j,(image,target) in enumerate(train_dataloader):
             noise=torch.randn_like(image).to(device)
             image=image.to(device)
-            pred=model(image,noise)
+            target=target.to(device)
+            pred=model(image,noise,target)
             loss=loss_fn(pred,noise)
             loss.backward()
             optimizer.step()
@@ -102,7 +104,7 @@ def main(args):
         torch.save(ckpt,"results/epoch_{:0>3}_steps_{:0>8}.pt".format(i + 1, global_steps))
 
         model_ema.eval()
-        samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device)
+        samples=model_ema.module.sampling(args.n_samples,labels=torch.randint(0, model.num_classes, (args.n_samples,), device=device),clipped_reverse_diffusion=not args.no_clip,device=device)
         save_image(samples,"results/epoch_{:0>3}_steps_{:0>8}.png".format(i + 1, global_steps),nrow=int(math.sqrt(args.n_samples)))
 
 if __name__=="__main__":

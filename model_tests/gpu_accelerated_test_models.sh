@@ -13,7 +13,7 @@ read -p "Enter the SSH host/instance address (e.g. 129.146.33.218): " remote_ssh
 cd ../
 GPU_ACCELERATED_TRAINING_DIR="./gpu_accelerated_training/"
 MODEL_TEST_DIR="./model_tests/"
-TRAINED_MODELS_DIR="./trained_ddpm/"
+LC_TRAINED_MODELS_DIR="./lc_trained_ddpm/"
 
 read -p "Would you like to ssh into the instance to first copy the gpu-accelerated model testing scripts to the cluster? [y/n]: " SSH_CONNECT_1
 if [[ $SSH_CONNECT_1 == "y" ]]; then
@@ -22,7 +22,7 @@ if [[ $SSH_CONNECT_1 == "y" ]]; then
     echo "Connecting to SSH..."
     scp -i "$private_ssh_key" -r "$GPU_ACCELERATED_TRAINING_DIR" "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
     scp -i "$private_ssh_key" -r "$MODEL_TEST_DIR" "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
-    scp -i "$private_ssh_key" -r "$TRAINED_MODELS_DIR" "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
+    scp -i "$private_ssh_key" -r "$LC_TRAINED_MODELS_DIR" "$remote_ssh_user@$remote_ssh_host:/home/$remote_ssh_user/"
 else
     echo "Skipping files copy into the cluster"
 fi

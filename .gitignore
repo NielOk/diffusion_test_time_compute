@@ -12,4 +12,5 @@ training_data_methods/training_data.json
 .env
 
 # Trained models
-trained_ddpm/
+lc_trained_ddpm/
+nlc_trained_ddpm/
