@@ -126,7 +126,7 @@ def analyze_eval_data_loss(
     plt.plot(epoch_numbers, mean_model_losses, label='Model Loss')
     plt.plot(epoch_numbers, mean_model_ema_losses, label='Model EMA Loss')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    plt.ylabel('Test Loss')
     # Define custom tick positions (1, 5, 10, 15, 20, ...)
     tick_positions = list(range(5, max(epoch_numbers) + 1, 5))
     plt.xticks(tick_positions, rotation=90) 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     results_filename = 'results.json'
     
     # Collect eval data
-    test_models_loss(min_epoch=min_epoch, device=device, results_filename=results_filename) # Comment out once data has been collected
+    #test_models_loss(min_epoch=min_epoch, device=device, results_filename=results_filename) # Comment out once data has been collected
 
     # Analyze eval data
     analyze_eval_data_loss(min_epoch=min_epoch, results_filename=results_filename)
