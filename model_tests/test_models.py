@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import torch
 import torch.nn as nn
 
@@ -15,7 +16,8 @@ from utils import ExponentialMovingAverage
 
 def test_models(
         min_epoch = 1, # Minimum epoch number to start testing from
-        device = "cpu" # Device to run model on
+        device = "cpu", # Device to run model on
+        results_filename = "results.json" # File to save results to
         ):
     # Load data
     train_loader, test_loader = create_mnist_dataloaders(batch_size=128,image_size=28)
@@ -33,9 +35,14 @@ def test_models(
     sorted_model_paths = [f for _, f in sorted(zip(epoch_numbers, model_paths))]
     sorted_epoch_numbers = sorted(epoch_numbers)
 
+    model_evals = {}
     for i in range(len(sorted_model_paths)):
         model_path = sorted_model_paths[i]
         epoch_number = sorted_epoch_numbers[i]
+        print(f'Testing model at epoch {epoch_number}')
+
+        model_evals[epoch_number] = {'model_path': model_path, 
+                                     'losses': []}
 
         if epoch_number < min_epoch: 
             continue
@@ -62,9 +69,23 @@ def test_models(
                 noise = torch.randn_like(image)
                 pred_noise = model(image, noise)
                 loss = loss_fn(pred_noise, noise)
-                print(f"Epoch {epoch_number}, Example {i} Loss: {loss}")
+                model_evals[epoch_number]['losses'].append(loss.item())
+
+        # Save results
+        with open(results_filename, 'w') as f:
+            json.dump(model_evals, f)
+
+def analyze_eval_data(
+        results_filename='results.json'
+        ):
+    pass
     
 if __name__ == '__main__':
     min_epoch = 1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    results_filename = 'results.json'
+    
+    # Collect eval data
     test_models(min_epoch=min_epoch, device=device)
+
+    # Analyze eval data
