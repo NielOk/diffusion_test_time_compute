@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
 GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'gpu_accelerated_training')
-TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'trained_ddpm', 'results')
+LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results') # lc means label-conditioned, nlc means non-label-conditioned
 
 sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
 from train_mnist import create_mnist_dataloaders
@@ -23,11 +23,11 @@ def get_model_paths():
     # Get model filepaths
     epoch_numbers = []
     model_paths = []
-    for filename in os.listdir(TRAINED_MODELS_DIR):
+    for filename in os.listdir(LC_TRAINED_MODELS_DIR):
         if filename.endswith('.pt'):
             epoch_number = int(filename.split('epoch_')[1].split('_steps_')[0])
             epoch_numbers.append(epoch_number)
-            model_paths.append(os.path.join(TRAINED_MODELS_DIR, filename))
+            model_paths.append(os.path.join(LC_TRAINED_MODELS_DIR, filename))
     
     # Sort model filepaths by epoch number
     sorted_model_paths = [f for _, f in sorted(zip(epoch_numbers, model_paths))]
@@ -63,6 +63,7 @@ def test_models_loss(
         model=MNISTDiffusion(timesteps=1000,
                 image_size=28,
                 in_channels=1,
+                num_classes=10,
                 base_dim=64,
                 dim_mults=[2,4]).to(device)
         
@@ -80,11 +81,11 @@ def test_models_loss(
             image = image.to(device)
             target = target.to(device)
             noise = torch.randn_like(image).to(device)
-            pred_noise = model(image, noise)
+            pred_noise = model(image, noise, target)
             loss = loss_fn(pred_noise, noise)
             model_evals[epoch_number]['model_losses'].append(loss.item())
 
-            ema_pred_noise = model_ema(image, noise)
+            ema_pred_noise = model_ema(image, noise, target)
             ema_loss = loss_fn(ema_pred_noise, noise)
             model_evals[epoch_number]['model_ema_losses'].append(ema_loss.item())
 
@@ -138,7 +139,7 @@ if __name__ == '__main__':
     results_filename = 'results.json'
     
     # Collect eval data
-    #test_models_loss(min_epoch=min_epoch, device=device, results_filename=results_filename) # Comment out once data has been collected
+    test_models_loss(min_epoch=min_epoch, device=device, results_filename=results_filename) # Comment out once data has been collected
 
     # Analyze eval data
     analyze_eval_data_loss(min_epoch=min_epoch, results_filename=results_filename)
