@@ -11,23 +11,34 @@ import matplotlib.pyplot as plt
 
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
-GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
-LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results') # lc means label-conditioned, nlc means non-label-conditioned
 
-sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
-from train_mnist import create_mnist_dataloaders
-from model import MNISTDiffusion
-from utils import ExponentialMovingAverage
+def load_code(model_type='lc'):
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    elif model_type == 'lc':
+        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
+        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
+        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
+    else:
+        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
+        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
+        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
+
+    from train_mnist import create_mnist_dataloaders
+    from model import MNISTDiffusion
+    from utils import ExponentialMovingAverage
+    
+    return TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
 
 def get_model_paths():
     # Get model filepaths
     epoch_numbers = []
     model_paths = []
-    for filename in os.listdir(LC_TRAINED_MODELS_DIR):
+    for filename in os.listdir(TRAINED_MODELS_DIR):
         if filename.endswith('.pt'):
             epoch_number = int(filename.split('epoch_')[1].split('_steps_')[0])
             epoch_numbers.append(epoch_number)
-            model_paths.append(os.path.join(LC_TRAINED_MODELS_DIR, filename))
+            model_paths.append(os.path.join(TRAINED_MODELS_DIR, filename))
     
     # Sort model filepaths by epoch number
     sorted_model_paths = [f for _, f in sorted(zip(epoch_numbers, model_paths))]
@@ -35,12 +46,35 @@ def get_model_paths():
 
     return sorted_model_paths, sorted_epoch_numbers
 
+def load_model_architecture(device='cpu', model_type='lc'):
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    elif model_type == 'lc':
+        model = MNISTDiffusion(timesteps=1000,
+                image_size=28,
+                in_channels=1,
+                num_classes=10,
+                base_dim=64,
+                dim_mults=[2,4]).to(device)
+    else:
+        model = MNISTDiffusion(timesteps=1000,
+                image_size=28,
+                in_channels=1,
+                base_dim=64,
+                dim_mults=[2,4]).to(device)
+    
+    return model
+
 # Test models just based on the loss and ema loss
 def test_models_loss(
         min_epoch=1, # Minimum epoch number to start testing from
         device="cpu", # Device to run model on
+        model_type='lc', # 'lc' for label-conditioned, 'nlc' for non-label-condition
         results_filename="results.json" # File to save results to
         ):
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+
     # Load data
     train_loader, test_loader = create_mnist_dataloaders(batch_size=128,image_size=28)
 
@@ -60,12 +94,8 @@ def test_models_loss(
         if epoch_number < min_epoch: 
             continue
 
-        model=MNISTDiffusion(timesteps=1000,
-                image_size=28,
-                in_channels=1,
-                num_classes=10,
-                base_dim=64,
-                dim_mults=[2,4]).to(device)
+        # Load model architecture
+        model = load_model_architecture(device=device, model_type='nlc')
         
         model_ema=ExponentialMovingAverage(model, decay=0.995, device=device)
         
@@ -81,11 +111,18 @@ def test_models_loss(
             image = image.to(device)
             target = target.to(device)
             noise = torch.randn_like(image).to(device)
-            pred_noise = model(image, noise, target)
+            if model_type == 'lc':
+                pred_noise = model(image, noise, target)
+            else:
+                pred_noise = model(image, noise)
             loss = loss_fn(pred_noise, noise)
             model_evals[epoch_number]['model_losses'].append(loss.item())
 
-            ema_pred_noise = model_ema(image, noise, target)
+            if model_type == 'lc':
+                ema_pred_noise = model_ema(image, noise, target)
+            else:
+                ema_pred_noise = model_ema(image, noise)
+
             ema_loss = loss_fn(ema_pred_noise, noise)
             model_evals[epoch_number]['model_ema_losses'].append(ema_loss.item())
 
@@ -97,11 +134,18 @@ def test_models_loss(
 # Analyze eval data for loss 
 def analyze_eval_data_loss(
         min_epoch=1, # Minimum epoch number to start analyzing from
-        results_filename='results.json'
+        results_filename='results.json',
+        model_type='lc' # 'lc' for label-conditioned, 'nlc' for non-label-conditioned
         ):
     
     # Load results
-    results_filepath = os.path.join(MODEL_TEST_DIR, 'test_results', results_filename)
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    
+    if model_type == 'lc':
+        results_filepath = os.path.join(MODEL_TEST_DIR, 'lc_test_results', results_filename)
+    else:
+        results_filepath = os.path.join(MODEL_TEST_DIR, 'nlc_test_results', results_filename)
     with open(results_filepath, 'r') as f:
         results = json.load(f)
 
@@ -123,23 +167,27 @@ def analyze_eval_data_loss(
 
     # Graph results
     plt.figure(figsize=(10, 5))
-    plt.plot(epoch_numbers, mean_model_losses, label='Model Loss')
-    plt.plot(epoch_numbers, mean_model_ema_losses, label='Model EMA Loss')
+    plt.plot(epoch_numbers, mean_model_losses, label=f'Model Loss ({model_type})')
+    plt.plot(epoch_numbers, mean_model_ema_losses, label=f'Model EMA Loss ({model_type})')
     plt.xlabel('Epoch')
     plt.ylabel('Test Loss')
     # Define custom tick positions (1, 5, 10, 15, 20, ...)
     tick_positions = list(range(5, max(epoch_numbers) + 1, 5))
     plt.xticks(tick_positions, rotation=90) 
+    plt.title(f'Loss vs. Epoch ({model_type})')
     plt.legend()
-    plt.show()
+    plt.savefig(os.path.join(MODEL_TEST_DIR, f'loss_vs_epoch_{model_type}.png'))
 
 if __name__ == '__main__':
     min_epoch = 1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    results_filename = 'results.json'
+    model_type = 'nlc'  # 'lc' for label-conditioned, 'nlc' for non-label-conditioned
+    results_filename = f'{model_type}_results.json'
+
+    TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage = load_code(model_type=model_type)
     
     # Collect eval data
-    #test_models_loss(min_epoch=min_epoch, device=device, results_filename=results_filename) # Comment out once data has been collected
+    #test_models_loss(min_epoch=min_epoch, device=device, model_type=model_type, results_filename=results_filename) # Comment out once data has been collected
 
     # Analyze eval data
-    analyze_eval_data_loss(min_epoch=min_epoch, results_filename=results_filename)
+    analyze_eval_data_loss(min_epoch=min_epoch, results_filename=results_filename, model_type=model_type) # Comment out when collecting data on gpu
