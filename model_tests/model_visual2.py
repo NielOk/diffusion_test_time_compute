@@ -9,16 +9,18 @@ import sys
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
 GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'gpu_accelerated_training')
-TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'trained_ddpm', 'results')
+LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
+NLC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
 
 sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
-sys.path.append(TRAINED_MODELS_DIR)
+sys.path.append(LC_TRAINED_MODELS_DIR)
+sys.path.append(NLC_TRAINED_MODELS_DIR)
 
 from model import MNISTDiffusion  # Adjust if your import path is different
 
 CHECKPOINT = "epoch_012_steps_00005628.pt"
 
-def load_model(ckpt_path, device="cuda"):
+def load_model(ckpt_path, lc=True, device="cuda"):
     """
     Loads the MNISTDiffusion model with weights from the given checkpoint path.
     """
