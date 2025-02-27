@@ -1,5 +1,5 @@
 ''' 
-Metrics-based testing of models trained on MNIST dataset using DDPM.
+Metrics-based testing of models trained on MNIST dataset using DDPM. These assume the models are lc_trained_ddpm models.
 '''
 
 import os
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
-GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'gpu_accelerated_training')
+GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
 LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results') # lc means label-conditioned, nlc means non-label-conditioned
 
 sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
