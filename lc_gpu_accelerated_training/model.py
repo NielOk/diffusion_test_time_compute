@@ -5,7 +5,7 @@ from unet import Unet
 from tqdm import tqdm
 
 class MNISTDiffusion(nn.Module):
-    def __init__(self,image_size,in_channels,num_classes,time_embedding_dim=256,timesteps=1000,base_dim=32,dim_mults= [1, 2, 4, 8]):
+    def __init__(self,image_size,in_channels,num_classes=10,time_embedding_dim=256,timesteps=1000,base_dim=32,dim_mults= [1, 2, 4, 8]):
         super().__init__()
         self.timesteps=timesteps
         self.in_channels=in_channels
