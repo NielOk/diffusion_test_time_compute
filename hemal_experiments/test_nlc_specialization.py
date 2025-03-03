@@ -26,7 +26,7 @@ import seaborn as sns
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # Number of experiments per digit (how many times we steer the model for each digit)
-N_EXPERIMENTS = 5
+N_EXPERIMENTS = 10
 
 # For “search pruning” – how often we prune candidates
 SCORING_TIMESTEPS = 200
@@ -49,7 +49,7 @@ REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
 GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
 TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
 
-DIGIT_ARRAY = [5]
+DIGIT_ARRAY = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
 sys.path.append(TRAINED_MODELS_DIR)
