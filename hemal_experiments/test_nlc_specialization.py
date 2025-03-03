@@ -8,13 +8,11 @@ import os
 import sys
 import datetime
 
-# Torchvision + DataLoader
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
 
-# Keras classifier
-import tensorflow as tf
-from keras.models import load_model
+# Hugging Face imports
+from transformers import AutoModelForImageClassification, AutoFeatureExtractor
 
 # Metrics
 from sklearn.metrics import confusion_matrix
@@ -32,9 +30,14 @@ N_EXPERIMENTS = 5
 
 # For “search pruning” – how often we prune candidates
 SCORING_TIMESTEPS = 200
+CHECKPOINTS = [100, 400, 500, 600, 700, 800]
 
 # Number of noise candidates to spawn at each attempt
-N_CANDIDATES = 16
+N_CANDIDATES = 64
+
+# Hugging Face MNIST classifier repository
+# (For example: "farleyknight/mnist-digit-classification-2022-09-04")
+HF_MODEL_NAME = "farleyknight/mnist-digit-classification-2022-09-04"
 
 # Data
 MNIST_ROOT = "./mnist_data"
@@ -46,14 +49,12 @@ REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
 GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
 TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
 
-# Keras classifier path
-CLASSIFIER_PATH = os.path.join(MODEL_TEST_DIR, 'MNIST-Classifier','weights.hdf5')
+DIGIT_ARRAY = [5]
 
 sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
 sys.path.append(TRAINED_MODELS_DIR)
 
 from model import MNISTDiffusion  # Adjust if your model import path is different
-
 
 # ============================
 # Logging Directory
@@ -175,29 +176,50 @@ def plot_image(image_tensor, title="Generated Image"):
     plt.axis('off')
 
 
-def load_keras_classifier(model_path):
-    """
-    Loads a Keras MNIST classifier (trained separately).
-    Make sure your environment can run tf/keras + PyTorch side by side.
-    """
-    return load_model(model_path)
+# ======== Hugging Face Classifier Loading & Inference =========
 
-
-def classify_generated_images(torch_images, classifier):
+def load_hf_classifier(model_name=HF_MODEL_NAME, device="cuda"):
     """
-    Classify a batch of PyTorch tensors using the Keras classifier.
-    - torch_images: shape [N, 1, 28, 28], range ~[-1,1]
+    Loads a Hugging Face MNIST classifier (e.g. a ViT model).
+    """
+    print(f"Loading Hugging Face model: {model_name}")
+    model = AutoModelForImageClassification.from_pretrained(model_name).to(device)
+    feature_extractor = AutoFeatureExtractor.from_pretrained(model_name)
+    model.eval()
+    return model, feature_extractor
+
+def classify_generated_images_hf(torch_images, hf_model, feature_extractor, device="cuda"):
+    """
+    Classify a batch of PyTorch images (shape [N,1,28,28], range ~[-1,1])
+    using the Hugging Face model.
     Returns predicted labels as a numpy array of shape [N].
     """
-    # Convert from [-1,1] to [0,1]
-    # shape: (N,1,28,28) -> (N,28,28,1) for Keras channels-last
-    imgs_np = torch_images.detach().cpu().numpy()
-    imgs_np = (imgs_np + 1) / 2.0  # => [0,1]
-    imgs_np = np.transpose(imgs_np, (0, 2, 3, 1))  # => (N,28,28,1)
+    from PIL import Image
 
-    # Use classifier.predict
-    preds = classifier.predict(imgs_np, batch_size=32)
-    predicted_labels = np.argmax(preds, axis=1)
+    pil_images = []
+    for i in range(torch_images.size(0)):
+        # Convert each image to CPU array
+        arr = torch_images[i].detach().cpu().numpy().squeeze()
+        # Scale [-1,1] => [0,255]
+        arr_255 = (arr + 1.0) / 2.0 * 255.0
+        arr_255 = np.clip(arr_255, 0, 255).astype(np.uint8)
+
+        # Create a grayscale PIL image, then convert to RGB
+        pil_img = Image.fromarray(arr_255, mode='L').convert('RGB')
+        pil_images.append(pil_img)
+
+    # Let the feature extractor handle resizing, normalization, etc.
+    # We'll feed all images at once if memory allows; otherwise, chunk them.
+    inputs = feature_extractor(images=pil_images, return_tensors="pt")
+
+    # Move input tensors to the correct device
+    for k, v in inputs.items():
+        inputs[k] = v.to(device)
+
+    # Forward pass
+    with torch.no_grad():
+        logits = hf_model(**inputs).logits  # shape [N,10]
+    predicted_labels = logits.argmax(dim=-1).cpu().numpy()
     return predicted_labels
 
 
@@ -212,16 +234,15 @@ def main():
     print(f"Loading diffusion model from: {ckpt_path}")
     diffusion_model = load_diffusion_model(ckpt_path, device)
 
-    # Prepare Keras classifier
-    print(f"Loading Keras MNIST classifier from: {CLASSIFIER_PATH}")
-    keras_classifier = load_keras_classifier(CLASSIFIER_PATH)
+    # Load Hugging Face classifier
+    hf_model, feature_extractor = load_hf_classifier(device=device)
 
     # We’ll store all generated images here for final evaluation
     # Each element: (tensor_of_shape[1,1,28,28], intended_digit)
     generated_samples = []
 
     # Decide which timesteps we’ll compute target_means for
-    checkpoints = list(range(0, diffusion_model.timesteps, SCORING_TIMESTEPS))
+    checkpoints = CHECKPOINTS
     print(f"Scoring checkpoints: {checkpoints}")
 
     # For final montage
@@ -229,8 +250,7 @@ def main():
     fig_montage.suptitle("Generated Samples (Best Candidate per Experiment)")
 
     # Generate images for digits 0-9
-    total_plots = 10 * N_EXPERIMENTS
-    for digit in range(10):
+    for digit in DIGIT_ARRAY:
         # 1) Build dataloader for the digit
         digit_loader = create_digit_dataloader(digit=digit, batch_size=128)
 
@@ -274,8 +294,8 @@ def main():
     all_images = torch.cat([item[0] for item in generated_samples], dim=0)  # shape: [N,1,28,28]
     all_intended_digits = np.array([item[1] for item in generated_samples], dtype=int)
 
-    # Use Keras classifier to get predictions
-    predicted_labels = classify_generated_images(all_images, keras_classifier)
+    # Use Hugging Face classifier
+    predicted_labels = classify_generated_images_hf(all_images, hf_model, feature_extractor, device=device)
 
     # Compute accuracy
     correct = np.sum(predicted_labels == all_intended_digits)
@@ -298,7 +318,7 @@ def main():
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=range(10), yticklabels=range(10))
     plt.xlabel("Predicted Label")
     plt.ylabel("Intended Digit")
-    plt.title("Confusion Matrix of Generated Digits vs. Keras Classifier Predictions")
+    plt.title("Confusion Matrix of Generated Digits vs. HF Model Predictions")
 
     cm_path = os.path.join(LOG_DIR, "confusion_matrix.png")
     plt.savefig(cm_path, dpi=150)
