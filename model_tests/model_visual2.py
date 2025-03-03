@@ -1,84 +1,95 @@
-# visualize_denoising.py
-
 import torch
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
-import math
+import numpy as np
 import os
 import sys
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, Subset
 
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
-GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'gpu_accelerated_training')
-LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
-NLC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
 
-sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
-sys.path.append(LC_TRAINED_MODELS_DIR)
-sys.path.append(NLC_TRAINED_MODELS_DIR)
-
-from model import MNISTDiffusion  # Adjust if your import path is different
-
-CHECKPOINT = "epoch_012_steps_00005628.pt"
-
-def load_model(ckpt_path, lc=True, device="cuda"):
-    """
-    Loads the MNISTDiffusion model with weights from the given checkpoint path.
-    """
-    # Create an instance of the model (must match training hyperparams)
-    model = MNISTDiffusion(
-        timesteps=1000,   # Must match the timesteps used in training
-        image_size=28,    # MNIST image size
-        in_channels=1,    # MNIST is 1-channel
-        base_dim=64,      # Must match --model_base_dim
-        dim_mults=[2, 4]  # Must match the model config used in training
-    )
-    model.to(device)
-
-    # Load checkpoint
-    ckpt = torch.load(ckpt_path, map_location=device)
-
-    # If you want the EMA weights for best results, load from "model_ema"
-    if "model_ema" in ckpt:
-        ema_state = ckpt["model_ema"]
-        # The averaged parameters are stored under "module" in EMA's state_dict
-        if "module" in ema_state:
-            model.load_state_dict(ema_state["module"], strict=False)
-        else:
-            # Fallback if your checkpoint uses a different key
-            model.load_state_dict(ckpt["model"], strict=False)
+def load_code(model_type='lc'):
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    elif model_type == 'lc':
+        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
+        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
+        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
     else:
-        # Otherwise load the raw model weights
-        model.load_state_dict(ckpt["model"], strict=False)
+        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
+        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
+        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
 
-    model.eval()
+    from train_mnist import create_mnist_dataloaders
+    from model import MNISTDiffusion
+    from utils import ExponentialMovingAverage
+    
+    return TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
+
+def get_model_paths(TRAINED_MODELS_DIR):
+    # Get model filepaths
+    epoch_numbers = []
+    model_paths = []
+    for filename in os.listdir(TRAINED_MODELS_DIR):
+        if filename.endswith('.pt'):
+            epoch_number = int(filename.split('epoch_')[1].split('_steps_')[0])
+            epoch_numbers.append(epoch_number)
+            model_paths.append(os.path.join(TRAINED_MODELS_DIR, filename))
+    
+    # Sort model filepaths by epoch number
+    sorted_model_paths = [f for _, f in sorted(zip(epoch_numbers, model_paths))]
+    sorted_epoch_numbers = sorted(epoch_numbers)
+
+    return sorted_model_paths, sorted_epoch_numbers
+
+def load_model_architecture(MNISTDiffusion,device='cpu', model_type='lc'):
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    elif model_type == 'lc':
+        model = MNISTDiffusion(timesteps=1000,
+                image_size=28,
+                in_channels=1,
+                num_classes=10,
+                base_dim=64,
+                dim_mults=[2,4]).to(device)
+    else:
+        model = MNISTDiffusion(timesteps=1000,
+                image_size=28,
+                in_channels=1,
+                base_dim=64,
+                dim_mults=[2,4]).to(device)
+    
     return model
 
-
-@torch.no_grad()
-def get_denoising_steps(model, n_samples=1, device="cuda", steps_to_show=10, use_clip=True):
-    """
-    Performs reverse diffusion step-by-step from random noise, 
-    returns a list of images at selected timesteps so we can
-    visualize how the noise is denoised over time.
-
-    Args:
-        model: MNISTDiffusion instance (already loaded and in eval mode).
-        n_samples: how many samples (digits) to generate at once.
-        device: "cuda" or "cpu".
-        steps_to_show: number of intermediate steps to collect for visualization.
-        use_clip: whether to use the clipped reverse diffusion.
-
-    Returns:
-        A list of (timestep, images) pairs, where images have shape
-        [n_samples, 1, 28, 28].
-    """
+def get_denoising_steps(model,
+                    n_samples,
+                    model_type='lc', 
+                    device='cpu',
+                    steps_to_show=20, 
+                    use_clip=True, # whether to use _reverse_diffusion_with_clip or _reverse_diffusion. Not to do with OpenAI clip. 
+                    labels=None # only used if model_type='lc'. Should be a list of desired labels for each sample, which will be converted to a tensor of shape (n_samples,)
+                    ):
+    
+    if len(labels) != n_samples:
+        raise ValueError('labels must be a list of length n_samples')
+    
+    if model_type not in ['lc', 'nlc']:
+        raise ValueError('model_type must be one of "lc" or "nlc"')
+    
+    # Convert labels to tensor
+    labels = torch.tensor(labels, device=device)
+    
     timesteps = model.timesteps
+
+    # Generate random noise
     x_t = torch.randn(
         (n_samples, model.in_channels, model.image_size, model.image_size), 
         device=device
     )
 
-    # Pick which timesteps to store for plotting
+     # Pick which timesteps to store for plotting
     steps_indices = torch.linspace(timesteps - 1, 0, steps_to_show, dtype=torch.int).tolist()
     steps_indices = sorted(list(set(int(s) for s in steps_indices)), reverse=True)
 
@@ -88,10 +99,16 @@ def get_denoising_steps(model, n_samples=1, device="cuda", steps_to_show=10, use
         t = torch.tensor([i] * n_samples, device=device)
         noise = torch.randn_like(x_t) if i > 0 else torch.zeros_like(x_t)
 
-        if use_clip:
-            x_t = model._reverse_diffusion_with_clip(x_t, t, noise)
-        else:
-            x_t = model._reverse_diffusion(x_t, t, noise)
+        if model_type == 'lc':
+            if use_clip:
+                x_t = model._reverse_diffusion_with_clip(x_t, t, noise, labels)
+            else:
+                x_t = model._reverse_diffusion(x_t, t, noise, labels)
+        elif model_type == 'nlc':
+            if use_clip:
+                x_t = model._reverse_diffusion_with_clip(x_t, t, noise)
+            else:
+                x_t = model._reverse_diffusion(x_t, t, noise)
 
         # Save intermediate steps if i is in our selected list
         if i in steps_indices:
@@ -133,31 +150,41 @@ def plot_denoising_process(images_over_time, n_samples=1):
     plt.tight_layout()
     plt.show()
 
+def singular_model_experiment():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_type = 'lc'  # 'lc' for label-conditioned, 'nlc' for non-label-conditioned
 
-def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    # <-- Replace with your actual checkpoint file
-    ckpt_path = os.path.join(TRAINED_MODELS_DIR, CHECKPOINT)
+    # Load code
+    TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage = load_code(model_type=model_type)
 
-    # 1. Load the model
-    model = load_model(ckpt_path, device=device)
+    # Load data
+    train_loader, test_loader = create_mnist_dataloaders(batch_size=128,image_size=28)
 
-    # 2. Run step-by-step reverse diffusion
-    n_samples = 4           # how many digits to generate in parallel
-    steps_to_show = 8       # how many intermediate frames to visualize
-    use_clip = True         # whether to use _reverse_diffusion_with_clip
+    # Load model architecture
+    model = load_model_architecture(MNISTDiffusion, device=device, model_type=model_type)
+    model_ema = ExponentialMovingAverage(model, decay=0.995, device=device)
 
-    images_over_time = get_denoising_steps(
-        model,
-        n_samples=n_samples,
-        device=device,
-        steps_to_show=steps_to_show,
-        use_clip=use_clip
-    )
+    # Get model filepaths
+    sorted_model_paths, sorted_epoch_numbers = get_model_paths(TRAINED_MODELS_DIR)
 
-    # 3. Plot the results
+    # Select model to load based on epoch number
+    epoch_number = 100
+    model_to_load = sorted_model_paths[sorted_epoch_numbers.index(epoch_number)]
+
+    # Load model weights
+    checkpoint = torch.load(model_to_load, map_location=torch.device(device))
+    model.load_state_dict(checkpoint['model'])
+    model_ema.load_state_dict(checkpoint['model_ema'])
+
+    # Search over paths
+    n_samples = 4
+    steps_to_show = 20
+    use_clip = True
+    labels = [0, 1, 2, 3]
+    images_over_time = get_denoising_steps(model, n_samples, model_type=model_type, device=device, steps_to_show=steps_to_show, use_clip=use_clip, labels=labels)
+
+    # Plot the results
     plot_denoising_process(images_over_time, n_samples=n_samples)
 
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    singular_model_experiment()
