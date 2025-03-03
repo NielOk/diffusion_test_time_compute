@@ -13,7 +13,7 @@ from PIL import Image
 # Constants (tweak these as needed)
 # ============================================================================
 CHECKPOINT = "epoch_100_steps_00046900.pt"
-DIGIT = 4 # Change this to any digit 0-9
+DIGIT = 0 # Change this to any digit 0-9
 
 # Increase candidate pool
 N_CANDIDATES = 32  # was 16
@@ -42,13 +42,13 @@ def load_clip_model(device="cuda"):
     Loads OpenAI CLIP (ViT-B/32) and a textual prompt describing the digit.
     Returns (clip_model, clip_preprocess, text_embedding).
     """
-    clip_model, preprocess = clip.load("ViT-B/32", device=device)
+    clip_model, preprocess = clip.load("RN101", device=device)
     clip_model.eval()
 
     # A more descriptive text prompt:
     text_prompt = (
-        f"a black and white photo of a handwritten digit '{DIGIT}' "
-        "in MNIST style, centered on a white background"
+        f"An accurately drawn, neatly handwritten digit '{DIGIT}' in the style "
+        f"of MNIST, on a clean white background, high contrast, no artifacts, black ink."
     )
 
     with torch.no_grad():
