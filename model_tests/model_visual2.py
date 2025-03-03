@@ -6,6 +6,7 @@ import os
 import sys
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
+import inspect
 
 MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
@@ -13,21 +14,45 @@ REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
 def load_code(model_type='lc'):
     if model_type not in ['lc', 'nlc']:
         raise ValueError('model_type must be one of "lc" or "nlc"')
-    elif model_type == 'lc':
-        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
-        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
-        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
-    else:
-        GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
-        TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
-        sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
-
-    from train_mnist import create_mnist_dataloaders
-    from model import MNISTDiffusion
-    from utils import ExponentialMovingAverage
     
-    return TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
+    if 'model' in sys.modules:
+        del sys.modules['model']
+    if 'utils' in sys.modules:
+        del sys.modules['utils']
+    if 'train_mnist' in sys.modules:
+        del sys.modules['train_mnist']
+    if 'unet' in sys.modules:
+        del sys.modules['unet']
 
+    # Get directories
+    lc_gpu_accelerated_training = os.path.join(REPO_DIR, 'lc_gpu_accelerated_training')
+    LC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'lc_trained_ddpm', 'results')
+    nlc_gpu_accelerated_training = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
+    NLC_TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
+
+    if model_type == 'lc':
+        sys.path.append(lc_gpu_accelerated_training)
+
+        if nlc_gpu_accelerated_training in sys.path:
+            sys.path.remove(nlc_gpu_accelerated_training)
+        
+        from train_mnist import create_mnist_dataloaders
+        from model import MNISTDiffusion
+        from utils import ExponentialMovingAverage
+
+        return LC_TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
+
+    elif model_type == 'nlc':
+        sys.path.append(nlc_gpu_accelerated_training)
+        if lc_gpu_accelerated_training in sys.path:
+            sys.path.remove(lc_gpu_accelerated_training)
+
+        from train_mnist import create_mnist_dataloaders
+        from model import MNISTDiffusion
+        from utils import ExponentialMovingAverage
+
+        return NLC_TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
+    
 def get_model_paths(TRAINED_MODELS_DIR):
     # Get model filepaths
     epoch_numbers = []
@@ -150,7 +175,7 @@ def plot_denoising_process(images_over_time, n_samples=1):
     plt.tight_layout()
     plt.show()
 
-def singular_model_experiment():
+def visualizer_single_model_experiment():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_type = 'lc'  # 'lc' for label-conditioned, 'nlc' for non-label-conditioned
 
@@ -187,4 +212,4 @@ def singular_model_experiment():
     plot_denoising_process(images_over_time, n_samples=n_samples)
 
 if __name__ == '__main__':
-    singular_model_experiment()
+    visualizer_single_model_experiment()

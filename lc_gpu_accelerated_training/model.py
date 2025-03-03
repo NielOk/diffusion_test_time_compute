@@ -67,7 +67,28 @@ class MNISTDiffusion(nn.Module):
         #q(x_{t}|x_{t-1})
         return self.sqrt_alphas_cumprod.gather(-1,t).reshape(x_0.shape[0],1,1,1)*x_0+ \
                 self.sqrt_one_minus_alphas_cumprod.gather(-1,t).reshape(x_0.shape[0],1,1,1)*noise
+    
+    def _partial_forward_diffusion(self, x_t_start, t_start, t_end, noise):
+        """
+        Forward diffuse from time t_start to t_end. 
+        E.g., if t_start=10 and t_end=20, 
+        we do x_{20} = sqrt(alpha_{20} / alpha_{10}) * x_{10} + ...
+        """
+        assert x_t_start.shape == noise.shape, \
+            f"x_t_start has shape {x_t_start.shape}, noise has shape {noise.shape}"
+        # Gather alpha_cumprod for start & end
+        alpha_cumprod_start = self.alphas_cumprod.gather(0, t_start).view(-1,1,1,1)
+        alpha_cumprod_end   = self.alphas_cumprod.gather(0, t_end).view(-1,1,1,1)
 
+        # ratio = alpha_cumprod_end / alpha_cumprod_start
+        ratio = alpha_cumprod_end / alpha_cumprod_start
+
+        # sqrt(ratio)
+        sqrt_alpha_ratio = torch.sqrt(ratio)
+        # sqrt(1 - ratio)
+        sqrt_one_minus_alpha_ratio = torch.sqrt(1 - ratio)
+
+        return sqrt_alpha_ratio * x_t_start + sqrt_one_minus_alpha_ratio * noise
 
     @torch.no_grad()
     def _reverse_diffusion(self,x_t,t,noise,labels):
