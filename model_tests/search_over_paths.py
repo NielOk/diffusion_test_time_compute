@@ -51,7 +51,7 @@ def estimate_target_distribution(model, digit, digit_loader, checkpoints, device
         target_means[t] = factor * global_mean.unsqueeze(0)
     return target_means
 
-def denoise_to_step(model, candidates, t, start_point, labels, device="cpu", use_clip=True):
+def denoise_to_step(model, candidates, t, start_point, labels, device="cpu", ema=False, use_clip=True):
 
     for step in range(start_point, t, -1):
 
@@ -59,10 +59,16 @@ def denoise_to_step(model, candidates, t, start_point, labels, device="cpu", use
 
         t_tensor = torch.full((candidates.shape[0],), step, device=device, dtype=torch.long)
         noise = torch.randn_like(candidates)
-        if use_clip:
-            candidates = model._reverse_diffusion_with_clip(candidates, t_tensor, noise, labels)
+        if ema:
+            if use_clip:
+                candidates = model.module._reverse_diffusion_with_clip(candidates, t_tensor, noise, labels)
+            else:
+                candidates = model.module._reverse_diffusion(candidates, t_tensor, noise, labels)
         else:
-            candidates = model._reverse_diffusion(candidates, t_tensor, noise, labels)
+            if use_clip:
+                candidates = model._reverse_diffusion_with_clip(candidates, t_tensor, noise, labels)
+            else:
+                candidates = model._reverse_diffusion(candidates, t_tensor, noise, labels)
 
     return candidates  # Denoised images at step `t`
 
@@ -97,7 +103,10 @@ def lc_search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit
         labels = torch.full((candidates.shape[0],), digit_to_generate, dtype=torch.long, device=device)
 
         # Denoise candidates to checkpoint
-        candidates = denoise_to_step(model, candidates, t - delta_b, t, labels, device = device, use_clip=use_clip)
+        if ema:
+            candidates = denoise_to_step(model_ema, candidates, t - delta_b, t, labels, device=device, ema=ema, use_clip=use_clip)
+        else:
+            candidates = denoise_to_step(model, candidates, t - delta_b, t, labels, device=device, ema=ema, use_clip=use_clip)
 
         t -= delta_b
         # Select top n candidates at checkpoint with scoring method
@@ -127,7 +136,10 @@ def lc_search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit
     # Denoise candidates to step 0
     noise = torch.randn_like(candidates, device=device)
     labels = torch.full((candidates.shape[0],), digit_to_generate, dtype=torch.long, device=device)
-    candidates = denoise_to_step(model, candidates, 0, t, labels, device = device, use_clip=use_clip)
+    if ema:
+        candidates = denoise_to_step(model_ema, candidates, 0, t, labels, device = device, ema=ema, use_clip=use_clip)
+    else:
+        candidates = denoise_to_step(model, candidates, 0, t, labels, device = device, ema=ema, use_clip=use_clip)
 
     # Select best candidate
     if scoring_method == 'mean_distribution_accuracy':
@@ -158,7 +170,7 @@ def singular_model_experiment():
     delta_b = 60 # Number of steps to denoise back to
 
     # Search over paths
-    ema = False
+    ema = True # Use EMA for this test
     n_samples = 1
     use_clip = True
     labels = None
@@ -189,6 +201,9 @@ def singular_model_experiment():
     checkpoint = torch.load(model_to_load, map_location=torch.device(device))
     model.load_state_dict(checkpoint['model'])
     model_ema.load_state_dict(checkpoint['model_ema'])
+
+    model_ema.eval()
+    model.eval()
 
     digit_loader = create_digit_dataloader(digit=digit_to_generate, batch_size=128)
 
