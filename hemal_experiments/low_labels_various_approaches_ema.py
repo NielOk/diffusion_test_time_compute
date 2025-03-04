@@ -32,13 +32,13 @@ USE_EMA = True      # If True, load ckpt["model_ema"], else load ckpt["model"]
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # For “search pruning” – how often we prune candidates
-CHECKPOINTS = [100, 300, 600, 700, 800, 900]
+CHECKPOINTS = [100, 300, 500, 600, 700, 800, 900]
 APPROACHES_TO_TRY = ["mse", "bayes", "mixture"]
-N_EXPERIMENTS_PER_DIGIT = 1
+N_EXPERIMENTS_PER_DIGIT = 20
 VERIFIER_DATA_SIZES = [10, 50, 100, 150, 200, 250, 300, 350, 400]
 
 # Number of noise candidates to spawn at each attempt
-N_CANDIDATES = 64
+N_CANDIDATES = 128
 
 # Hugging Face MNIST classifier repository
 HF_MODEL_NAME = "farleyknight/mnist-digit-classification-2022-09-04"
