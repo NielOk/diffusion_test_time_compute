@@ -1,6 +1,3 @@
-# modified version with bayes rule updates, mixture model (may be quite slow), and additional logging/printing and saving hyperparams in txt file
-
-
 #!/usr/bin/env python3
 
 import torch
@@ -27,13 +24,17 @@ import seaborn as sns
 # Script Configuration
 # ============================
 
+# --- New: set which "type" of model and whether to use EMA weights ---
+MODEL_TYPE = "nlc"  # "lc" or "nlc" (you said you'll always use non-label-conditioned, so "nlc" is default)
+USE_EMA = True      # If True, load ckpt["model_ema"], else load ckpt["model"]
+
 # Path to the trained unconditional diffusion model checkpoint
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # For “search pruning” – how often we prune candidates
 CHECKPOINTS = [100, 300, 600, 700, 800, 900]
 APPROACHES_TO_TRY = ["mse", "bayes", "mixture"]
-N_EXPERIMENTS_PER_DIGIT = 20
+N_EXPERIMENTS_PER_DIGIT = 1
 VERIFIER_DATA_SIZES = [10, 50, 100, 150, 200, 250, 300, 350, 400]
 
 # Number of noise candidates to spawn at each attempt
@@ -107,8 +108,11 @@ def create_digit_dataloader(digit, subset_size=None, batch_size=128, image_size=
     return DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
 
-def load_diffusion_model(ckpt_path, device="cuda"):
-    """Load your trained DDPM model (unconditional)."""
+def load_diffusion_model(ckpt_path, device="cuda", use_ema=False):
+    """
+    Load your trained DDPM model (unconditional).
+    Now has a 'use_ema' toggle to pick which part of the state dict to load.
+    """
     model = MNISTDiffusion(
         timesteps=1000,
         image_size=28,
@@ -117,8 +121,18 @@ def load_diffusion_model(ckpt_path, device="cuda"):
         dim_mults=[2, 4]
     )
     model.to(device)
+
     ckpt = torch.load(ckpt_path, map_location=device)
-    model.load_state_dict(ckpt["model"], strict=False)
+
+    if use_ema:
+        # Load EMA weights
+        model.load_state_dict(ckpt["model_ema"], strict=False)
+        print("Loaded EMA weights from checkpoint.")
+    else:
+        # Load standard model weights
+        model.load_state_dict(ckpt["model"], strict=False)
+        print("Loaded non-EMA weights from checkpoint.")
+
     model.eval()
     return model
 
@@ -526,16 +540,19 @@ def main():
     ckpt_path = os.path.join(TRAINED_MODELS_DIR, CHECKPOINT)
 
     print(f"Loading diffusion model from: {ckpt_path}")
-    diffusion_model = load_diffusion_model(ckpt_path, device=device)
+    diffusion_model = load_diffusion_model(
+        ckpt_path,
+        device=device,
+        use_ema=USE_EMA  # <- Pass in our new toggle
+    )
 
     # Load Hugging Face classifier
     hf_model, feature_extractor = load_hf_classifier(device=device)
 
-    # Let's define a set of approaches to try
-    # approaches_to_try = ["mse", "bayes", "mixture"]
+    # Approaches to try
     approaches_to_try = APPROACHES_TO_TRY
 
-    # We'll define the subset sizes for the scaling study:
+    # Subset sizes for the scaling study:
     verifier_data_sizes = VERIFIER_DATA_SIZES
     n_experiments_per_digit = N_EXPERIMENTS_PER_DIGIT
     
@@ -545,6 +562,8 @@ def main():
         # Write high-level config
         f_log.write("=== EXPERIMENT DETAILS ===\n")
         f_log.write(f"Timestamp: {timestamp}\n")
+        f_log.write(f"MODEL_TYPE: {MODEL_TYPE}\n")
+        f_log.write(f"USE_EMA: {USE_EMA}\n")
         f_log.write(f"Checkpoints: {CHECKPOINTS}\n")
         f_log.write(f"N_CANDIDATES: {N_CANDIDATES}\n")
         f_log.write(f"verifier_data_sizes: {verifier_data_sizes}\n")
