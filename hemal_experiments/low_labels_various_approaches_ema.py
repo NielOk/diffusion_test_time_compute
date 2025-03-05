@@ -51,13 +51,13 @@ USE_EMA = True      # If True, load ckpt["model_ema"], else load ckpt["model"]
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # For “search pruning” – how often we prune candidates
-CHECKPOINTS = [600, 700, 800, 900]
-APPROACHES_TO_TRY = ["mse" ]
-N_EXPERIMENTS_PER_DIGIT = 1
-VERIFIER_DATA_SIZES = [10]
+CHECKPOINTS = [100, 300, 500, 600, 700, 800, 900]
+APPROACHES_TO_TRY = ["mse", "bayes", "mixture"]
+N_EXPERIMENTS_PER_DIGIT = 20
+VERIFIER_DATA_SIZES = [10, 50, 100, 150, 200, 250, 300, 350, 400]
 
 # Number of noise candidates to spawn at each attempt
-N_CANDIDATES = 32
+N_CANDIDATES = 128
 
 # Hugging Face MNIST classifier repository
 HF_MODEL_NAME = "farleyknight/mnist-digit-classification-2022-09-04"
@@ -126,35 +126,6 @@ def create_digit_dataloader(digit, subset_size=None, batch_size=128, image_size=
         plt.show()
 
     return DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
-
-# def load_diffusion_model(ckpt_path, device="cuda", use_ema=False):
-#     """
-#     Load your trained DDPM model (unconditional).
-#     Now has a 'use_ema' toggle to pick which part of the state dict to load.
-#     """
-#     model = MNISTDiffusion(
-#         timesteps=1000,
-#         image_size=28,
-#         in_channels=1,
-#         base_dim=64,
-#         dim_mults=[2, 4]
-#     )
-#     model.to(device)
-
-#     ckpt = torch.load(ckpt_path, map_location=device)
-
-#     if use_ema:
-#         # Load EMA weights
-#         model.load_state_dict(ckpt["model_ema"], strict=False)
-#         print("Loaded EMA weights from checkpoint.")
-#     else:
-#         # Load standard model weights
-#         model.load_state_dict(ckpt["model"], strict=False)
-#         print("Loaded non-EMA weights from checkpoint.")
-
-#     model.eval()
-#     return model
 
 def load_diffusion_model(ckpt_path, device="cuda", use_ema=False):
     """
