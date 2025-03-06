@@ -83,6 +83,8 @@ def get_checkpoints(num_steps, delta_f, delta_b):
 
     checkpoints.append(0) # Step 0 is always a checkpoint
 
+    print("Checkpoints:", checkpoints) # Checkpoints are where we will evaluate the candidates, or have scoring methods for the candidates.
+
     return checkpoints
 
 def lc_search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, digit_loader, ema=False, n_samples=4, use_clip=True, device='cpu', scoring_method='mean_distribution_accuracy'):
