@@ -38,10 +38,10 @@ APPROACHES_TO_TRY = ["mixture"]  # distribution approaches
 SEARCH_METHODS_TO_TRY = ["paths"]  # search methods
 
 # Number of repeated generation attempts per digit
-N_EXPERIMENTS_PER_DIGIT = 1
+N_EXPERIMENTS_PER_DIGIT = 5
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [100]
+VERIFIER_DATA_SIZES = [200, 400]
 
 # --- Separate numbers of candidates ---
 N_CANDIDATES_TOP_K = 128
@@ -116,6 +116,8 @@ def create_digit_dataloader(digit, subset_size=None, batch_size=128, image_size=
         plt.imshow(sample_image.squeeze(), cmap='gray')
         plt.title(f"Sample Digit: {sample_label}")
         plt.show()
+    
+    print(f"{len(indices)} sample images loaded for digit {digit}")
 
     return DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
