@@ -8,7 +8,9 @@ def test_flops():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_candidates = 3
     digit_to_generate = 8
-    t = 1
+    t = 500
+    delta_f = 30
+    delta_b = 60
 
     # Load code
     TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage = load_code(model_type=model_type)
@@ -41,17 +43,20 @@ def test_flops():
     )
     noise = torch.randn_like(candidates)
     t_tensor = torch.full((candidates.shape[0],), t, device=device, dtype=torch.long)
+    t_back_tensor = torch.full((candidates.shape[0],), t - delta_b, device=device, dtype=torch.long)
+    t_forward_tensor = torch.full((candidates.shape[0],), t - delta_b + delta_f, device=device, dtype=torch.long)
     if model_type == 'lc':
         labels = torch.full((candidates.shape[0],), digit_to_generate, dtype=torch.long, device=device)
     else:
         labels = None
 
+    # Set up inputs
     if model_type == 'lc':
         reverse_diffusion_input = (candidates, t_tensor, noise, labels)
-        forward_diffusion_input = (candidates, t_tensor, noise)
     else:
         reverse_diffusion_input = (candidates, t_tensor, noise)
-        forward_diffusion_input = (candidates, t_tensor, noise)
+    forward_diffusion_input = (candidates, t_tensor, noise)
+    partial_forward_diffusion_input = (candidates, t_back_tensor, t_forward_tensor, noise)
 
     # Run flops test for reverse diffusion
     with profiler.profile(with_flops=True) as prof:
@@ -68,6 +73,14 @@ def test_flops():
     # Sum all flops
     total_flops = sum(event.flops for event in prof.key_averages())
     print(f"Total FLOPs per forward diffusion for n_candidates={n_candidates}: {total_flops}")
+
+    # Run flops test for partial forward diffusion
+    with profiler.profile(with_flops=True) as prof:
+        model._partial_forward_diffusion(*partial_forward_diffusion_input)
+    
+    # Sum all flops
+    partial_forward_diffusion_total_flops = sum(event.flops for event in prof.key_averages())
+    print(f"Total FLOPs per partial forward diffusion for n_candidates={n_candidates}: {partial_forward_diffusion_total_flops}")
 
 if __name__ == '__main__':
     test_flops()
