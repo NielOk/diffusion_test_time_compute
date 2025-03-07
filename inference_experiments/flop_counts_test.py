@@ -47,17 +47,27 @@ def test_flops():
         labels = None
 
     if model_type == 'lc':
-        input = (candidates, t_tensor, noise, labels)
+        reverse_diffusion_input = (candidates, t_tensor, noise, labels)
+        forward_diffusion_input = (candidates, t_tensor, noise)
     else:
-        input = (candidates, t_tensor, noise)
+        reverse_diffusion_input = (candidates, t_tensor, noise)
+        forward_diffusion_input = (candidates, t_tensor, noise)
 
-    # Run flops test
+    # Run flops test for reverse diffusion
     with profiler.profile(with_flops=True) as prof:
-        model._reverse_diffusion(*input)
+        model._reverse_diffusion(*reverse_diffusion_input)
+    
+    # Sum all flops
+    reverse_diffusion_total_flops = sum(event.flops for event in prof.key_averages())
+    print(f"Total FLOPs per reverse diffusion for n_candidates={n_candidates}: {reverse_diffusion_total_flops}")
+
+    # Run flops test for forward diffusion
+    with profiler.profile(with_flops=True) as prof:
+        model._forward_diffusion(*forward_diffusion_input)
     
     # Sum all flops
     total_flops = sum(event.flops for event in prof.key_averages())
-    print(f"Total FLOPs per reverse diffusion for n_candidates={n_candidates}: {total_flops}")
+    print(f"Total FLOPs per forward diffusion for n_candidates={n_candidates}: {total_flops}")
 
 if __name__ == '__main__':
     test_flops()
