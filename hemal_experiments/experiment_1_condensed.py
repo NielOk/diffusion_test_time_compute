@@ -660,6 +660,10 @@ def run_scaling_study(
         cm_path = os.path.join(LOG_DIR, f"cm_{approach}_{search_method}_subset_{subset_size}.png")
         plt.savefig(cm_path, dpi=150)
         plt.close()
+        
+        _distribution_cache.clear()
+        print(f"Cache cleared after finishing subset_size={subset_size}. "
+              f"Current cache size: {len(_distribution_cache)}")
 
     return results
 
