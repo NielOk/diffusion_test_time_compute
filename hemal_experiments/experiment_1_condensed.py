@@ -58,7 +58,7 @@ SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 N_EXPERIMENTS_PER_DIGIT = 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1400, 1600, 2000]
+VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
 
 # --- Separate numbers of candidates ---
 N_CANDIDATES_TOP_K = 512
