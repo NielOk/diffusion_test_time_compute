@@ -3,3 +3,4 @@ torchvision
 tqdm
 argparse
 matplotlib
+git+https://github.com/openai/CLIP.git
