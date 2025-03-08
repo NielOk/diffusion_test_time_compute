@@ -51,14 +51,14 @@ CHECKPOINTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 # Approaches
 # APPROACHES_TO_TRY = ["mse", "bayes", "mixture"]  # distribution approaches
 # SEARCH_METHODS_TO_TRY = ["top_k", "paths"]       # search methods
-APPROACHES_TO_TRY = ["mse", "mixture", "bayes"]  # distribution approaches
+APPROACHES_TO_TRY = ["mse", "mixture"]  # distribution approaches
 SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 
 # Number of repeated generation attempts per digit
 N_EXPERIMENTS_PER_DIGIT = 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
+VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1400, 1600, 2000]
 
 # --- Separate numbers of candidates ---
 N_CANDIDATES_TOP_K = 512
