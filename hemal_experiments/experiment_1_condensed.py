@@ -18,6 +18,23 @@ from transformers import AutoModelForImageClassification, AutoFeatureExtractor
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 
+"""
+MNIST Training set sizes:
+Digit 0: 5923 examples
+Digit 1: 6742 examples
+Digit 2: 5958 examples
+Digit 3: 6131 examples
+Digit 4: 5842 examples
+Digit 5: 5421 examples
+Digit 6: 5918 examples
+Digit 7: 6265 examples
+Digit 8: 5851 examples
+Digit 9: 5949 examples
+
+Confirmed that preprocessing for HF classifier is being done correctly.
+"""
+
+
 # ============================
 # Script Configuration
 # ============================
@@ -29,23 +46,23 @@ USE_EMA = True      # If True, load ckpt["model_ema"], else ckpt["model"]
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # This list is now **only** for the top_k search:
-CHECKPOINTS = [100, 300, 500, 600, 700, 800, 900]
+CHECKPOINTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
 # Approaches
 # APPROACHES_TO_TRY = ["mse", "bayes", "mixture"]  # distribution approaches
 # SEARCH_METHODS_TO_TRY = ["top_k", "paths"]       # search methods
-APPROACHES_TO_TRY = ["mixture"]  # distribution approaches
-SEARCH_METHODS_TO_TRY = ["paths"]  # search methods
+APPROACHES_TO_TRY = ["mse", "mixture", "bayes"]  # distribution approaches
+SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 
 # Number of repeated generation attempts per digit
-N_EXPERIMENTS_PER_DIGIT = 5
+N_EXPERIMENTS_PER_DIGIT = 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [200, 400]
+VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
 
 # --- Separate numbers of candidates ---
-N_CANDIDATES_TOP_K = 128
-N_CANDIDATES_PATHS = 4
+N_CANDIDATES_TOP_K = 512
+N_CANDIDATES_PATHS = 5
 # --------------------------------------
 
 # If using the "paths" method, define partial forward/backward intervals:
