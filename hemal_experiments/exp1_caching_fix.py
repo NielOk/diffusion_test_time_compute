@@ -7,6 +7,7 @@ import numpy as np
 import os
 import sys
 import datetime
+import argparse
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
@@ -616,7 +617,7 @@ def run_scaling_study(
     diffusion_model,
     hf_model,
     feature_extractor,
-    verifier_data_sizes=[10, 50, 100],
+    verifier_data_size=10,
     approach="mse",
     search_method="top_k",
     n_experiments_per_digit=3,
@@ -628,54 +629,53 @@ def run_scaling_study(
     """
     results = {}
 
-    for subset_size in verifier_data_sizes:
-        print(f"\n=== Running experiments for subset_size={subset_size}, approach={approach}, "
-              f"search={search_method} ===")
+    print(f"\n=== Running experiments for subset_size={verifier_data_size}, approach={approach}, "
+            f"search={search_method} ===")
 
-        generated_samples = []
-        for digit in range(10):
-            digit_samples = generate_samples_for_digit(
-                model=diffusion_model,
-                digit=digit,
-                verifier_data_subset_size=subset_size,
-                approach=approach,
-                search_method=search_method,
-                n_experiments=n_experiments_per_digit,
-                device=device
-            )
-            generated_samples.extend(digit_samples)
+    generated_samples = []
+    for digit in range(10):
+        digit_samples = generate_samples_for_digit(
+            model=diffusion_model,
+            digit=digit,
+            verifier_data_subset_size=verifier_data_size,
+            approach=approach,
+            search_method=search_method,
+            n_experiments=n_experiments_per_digit,
+            device=device
+        )
+        generated_samples.extend(digit_samples)
 
-        # Classify
-        all_images = torch.cat([item[0] for item in generated_samples], dim=0)
-        all_intended_digits = np.array([item[1] for item in generated_samples], dtype=int)
+    # Classify
+    all_images = torch.cat([item[0] for item in generated_samples], dim=0)
+    all_intended_digits = np.array([item[1] for item in generated_samples], dtype=int)
 
-        predicted_labels = classify_generated_images_hf(all_images, hf_model, feature_extractor, device=device)
+    predicted_labels = classify_generated_images_hf(all_images, hf_model, feature_extractor, device=device)
 
-        correct = np.sum(predicted_labels == all_intended_digits)
-        total = len(all_intended_digits)
-        accuracy = correct / total
+    correct = np.sum(predicted_labels == all_intended_digits)
+    total = len(all_intended_digits)
+    accuracy = correct / total
 
-        print(f"  => Approach={approach.upper()} | Search={search_method} | "
-              f"subset_size={subset_size} | Accuracy={accuracy*100:.2f}% ({correct}/{total})")
+    print(f"  => Approach={approach.upper()} | Search={search_method} | "
+            f"subset_size={verifier_data_size} | Accuracy={accuracy*100:.2f}% ({correct}/{total})")
 
-        results[subset_size] = accuracy
+    results[verifier_data_size] = accuracy
 
-        # Optionally, save confusion matrix
-        cm = confusion_matrix(all_intended_digits, predicted_labels, labels=list(range(10)))
-        plt.figure(figsize=(6,5))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=range(10), yticklabels=range(10))
-        plt.xlabel("Predicted")
-        plt.ylabel("Intended")
-        plt.title(f"CM (Subset={subset_size}, Approach={approach}, Search={search_method})")
-        cm_path = os.path.join(LOG_DIR, f"cm_{approach}_{search_method}_subset_{subset_size}.png")
-        plt.savefig(cm_path, dpi=150)
-        plt.close()
+    # Optionally, save confusion matrix
+    cm = confusion_matrix(all_intended_digits, predicted_labels, labels=list(range(10)))
+    plt.figure(figsize=(6,5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=range(10), yticklabels=range(10))
+    plt.xlabel("Predicted")
+    plt.ylabel("Intended")
+    plt.title(f"CM (Subset={verifier_data_size}, Approach={approach}, Search={search_method})")
+    cm_path = os.path.join(LOG_DIR, f"cm_{approach}_{search_method}_subset_{verifier_data_size}.png")
+    plt.savefig(cm_path, dpi=150)
+    plt.close()
         
-        # Clear cache after finishing each subset size
-        _distribution_cache.clear()
-        print(f"Cache cleared after finishing subset_size={subset_size}. "
-              f"Current cache size: {len(_distribution_cache)}")
+    # Clear cache after finishing each subset size
+    _distribution_cache.clear()
+    print(f"Cache cleared after finishing subset_size={verifier_data_size}. "
+            f"Current cache size: {len(_distribution_cache)}")
 
     return results
 
@@ -728,45 +728,43 @@ def main():
         f_log.write(f"HF_MODEL_NAME: {HF_MODEL_NAME}\n\n")
 
         # Nested loops over approach & search method
-        for approach in APPROACHES_TO_TRY:
-            for search_method in SEARCH_METHODS_TO_TRY:
-                print(f"\n======== Starting scaling study for approach={approach}, "
-                      f"search={search_method} ========\n")
-                f_log.write(f"=== Approach={approach}, Search={search_method} ===\n")
+        print(f"\n======== Starting scaling study for approach={args.approach}, "
+                f"search={args.search_method} ========\n")
+        f_log.write(f"=== Approach={args.approach}, Search={args.search_method} ===\n")
 
-                results = run_scaling_study(
-                    diffusion_model=diffusion_model,
-                    hf_model=hf_model,
-                    feature_extractor=feature_extractor,
-                    verifier_data_sizes=VERIFIER_DATA_SIZES,
-                    approach=approach,
-                    search_method=search_method,
-                    n_experiments_per_digit=N_EXPERIMENTS_PER_DIGIT,
-                    device=device
-                )
+        results = run_scaling_study(
+            diffusion_model=diffusion_model,
+            hf_model=hf_model,
+            feature_extractor=feature_extractor,
+            verifier_data_size=args.verifier_data_size,
+            approach=args.approach,
+            search_method=args.search_method,
+            n_experiments_per_digit=N_EXPERIMENTS_PER_DIGIT,
+            device=device
+        )
 
-                # Plot results
-                plot_scaling_study_results(results, approach=approach, search_method=search_method)
+        # Plot results
+        plot_scaling_study_results(results, approach=args.approach, search_method=args.search_method)
 
-                # Save separate text summary
-                approach_result_path = os.path.join(LOG_DIR, f"results_{approach}_{search_method}.txt")
-                with open(approach_result_path, "w") as f_approach:
-                    f_approach.write(f"Approach={approach}, Search={search_method}\n")
-                    f_approach.write(f"(For top_k, used global CHECKPOINTS: {CHECKPOINTS})\n")
-                    f_approach.write(f"N_CANDIDATES_TOP_K: {N_CANDIDATES_TOP_K}\n")
-                    f_approach.write(f"N_CANDIDATES_PATHS: {N_CANDIDATES_PATHS}\n")
-                    f_approach.write(f"DELTA_F={DELTA_F}, DELTA_B={DELTA_B}\n")
-                    f_approach.write(f"verifier_data_sizes: {VERIFIER_DATA_SIZES}\n")
-                    f_approach.write(f"n_experiments_per_digit: {N_EXPERIMENTS_PER_DIGIT}\n")
-                    f_approach.write("Per-subset accuracy results:\n")
-                    for sz, acc in results.items():
-                        f_approach.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
+        # Save separate text summary
+        approach_result_path = os.path.join(LOG_DIR, f"results_{args.approach}_{args.search_method}.txt")
+        with open(approach_result_path, "w") as f_approach:
+            f_approach.write(f"Approach={args.approach}, Search={args.search_method}\n")
+            f_approach.write(f"(For top_k, used global CHECKPOINTS: {CHECKPOINTS})\n")
+            f_approach.write(f"N_CANDIDATES_TOP_K: {N_CANDIDATES_TOP_K}\n")
+            f_approach.write(f"N_CANDIDATES_PATHS: {N_CANDIDATES_PATHS}\n")
+            f_approach.write(f"DELTA_F={DELTA_F}, DELTA_B={DELTA_B}\n")
+            f_approach.write(f"verifier_data_sizes: {VERIFIER_DATA_SIZES}\n")
+            f_approach.write(f"n_experiments_per_digit: {N_EXPERIMENTS_PER_DIGIT}\n")
+            f_approach.write("Per-subset accuracy results:\n")
+            for sz, acc in results.items():
+                f_approach.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
 
-                # Also append to combined log file
-                f_log.write(f"Approach={approach}, Search={search_method}\n")
-                for sz, acc in results.items():
-                    f_log.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
-                f_log.write("\n")
+        # Also append to combined log file
+        f_log.write(f"Approach={args.approach}, Search={args.search_method}\n")
+        for sz, acc in results.items():
+            f_log.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
+        f_log.write("\n")
 
     print(f"\nAll experiments complete. Detailed logs saved to {full_log_path}")
     print("Done!")
@@ -774,4 +772,13 @@ def main():
           f"timesteps={get_path_checkpoints(diffusion_model.timesteps, DELTA_F, DELTA_B)}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--approach", type=str, choices=APPROACHES_TO_TRY,
+                        help="Approach to use")
+    parser.add_argument("--search_method", type=str, choices=SEARCH_METHODS_TO_TRY,
+                        help="Search method to use")
+    parser.add_argument("--verifier_data_size", type=int, choices=VERIFIER_DATA_SIZES,
+                        help="Verifier data size to use")
+    args = parser.parse_args()
+
     main()
