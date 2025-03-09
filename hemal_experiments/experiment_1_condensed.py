@@ -443,7 +443,7 @@ def search_over_paths(
         # Score & prune (if we have data for ckpt_t)
         scores_ckpt = score_candidates(approach, distribution_data, ckpt_t, candidates)
         if scores_ckpt is not None:
-            k = max(1, candidates.shape[0] // 2)
+            k = min(candidates.shape[0], n_candidates)
             topk_indices = torch.topk(scores_ckpt, k=k).indices
             candidates = candidates[topk_indices]
 
