@@ -351,8 +351,6 @@ def top_k_search(model, model_ema, distribution_data, approach, labels, ema=True
             topk_indices = torch.topk(scores_t, k=k).indices
             candidates = candidates[topk_indices]
 
-        print(t)
-
     # Final pick from the last batch
     scores_final = score_candidates(approach, distribution_data, 0, candidates)
     if scores_final is not None:
@@ -401,7 +399,7 @@ def denoise_to_step(model, candidates, t, start_point, labels, model_type="lc", 
 
     return candidates  # Denoised images at step `t`
 
-def get_checkpoints(num_steps, delta_f, delta_b):
+def get_checkpoints(delta_f, delta_b, num_steps=1000):
 
     checkpoints = []
     cur_step = num_steps - 1
@@ -479,3 +477,7 @@ def search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to
     best_candidate = candidates[best_idx]
 
     return best_candidate
+
+# ============================
+# Search Dispatcher
+# ============================
