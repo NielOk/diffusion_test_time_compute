@@ -10,7 +10,6 @@ from inference_experiment_utils import (
     load_code,
     load_model_architecture,
     get_model_paths,
-    ExponentialMovingAverage,
     denoise_to_step,
     classify_generated_images_hf,
     load_hf_classifier,
