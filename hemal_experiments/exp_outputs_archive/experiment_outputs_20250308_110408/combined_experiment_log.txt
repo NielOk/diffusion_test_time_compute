@@ -1,0 +1,15 @@
+=== EXPERIMENT DETAILS ===
+Timestamp: 20250308_110408
+MODEL_TYPE: nlc
+USE_EMA: True
+Checkpoints (used only for top_k): [100]
+
+N_CANDIDATES_TOP_K: 2
+N_CANDIDATES_PATHS: 5
+DELTA_F: 100, DELTA_B: 200
+verifier_data_sizes: [1]
+n_experiments_per_digit: 2
+Diffusion Model Checkpoint: epoch_100_steps_00046900.pt
+HF_MODEL_NAME: farleyknight/mnist-digit-classification-2022-09-04
+
+=== Approach=mse, Search=top_k ===

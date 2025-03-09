@@ -1,0 +1,15 @@
+=== EXPERIMENT DETAILS ===
+Timestamp: 20250305_001314
+MODEL_TYPE: nlc
+USE_EMA: False
+Checkpoints: [500, 600, 700, 800, 900]
+N_CANDIDATES: 32
+verifier_data_sizes: [10]
+n_experiments_per_digit: 1
+Diffusion Model (NLC) Checkpoint: epoch_100_steps_00046900.pt
+HF_MODEL_NAME: farleyknight/mnist-digit-classification-2022-09-04
+
+=== Approach: mse ===
+Approach: mse
+  subset_size=10, accuracy=0.4000
+

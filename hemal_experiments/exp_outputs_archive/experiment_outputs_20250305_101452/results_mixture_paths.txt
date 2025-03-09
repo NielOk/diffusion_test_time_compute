@@ -1,0 +1,11 @@
+Approach=mixture, Search=paths
+(For top_k, used global CHECKPOINTS: [100, 300, 500, 600, 700, 800, 900])
+N_CANDIDATES_TOP_K: 128
+N_CANDIDATES_PATHS: 4
+DELTA_F=100, DELTA_B=200
+verifier_data_sizes: [50, 200, 300]
+n_experiments_per_digit: 5
+Per-subset accuracy results:
+  subset_size=50, accuracy=0.7400
+  subset_size=200, accuracy=0.8400
+  subset_size=300, accuracy=0.7800

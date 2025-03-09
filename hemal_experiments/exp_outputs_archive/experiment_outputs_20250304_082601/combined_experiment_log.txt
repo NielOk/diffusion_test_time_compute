@@ -1,0 +1,18 @@
+=== EXPERIMENT DETAILS ===
+Timestamp: 20250304_082601
+MODEL_TYPE: nlc
+USE_EMA: True
+Checkpoints (used only for top_k): [100, 300, 500, 600, 700, 800, 900]
+
+N_CANDIDATES_TOP_K: 128
+N_CANDIDATES_PATHS: 3
+DELTA_F: 30, DELTA_B: 60
+verifier_data_sizes: [200]
+n_experiments_per_digit: 1
+Diffusion Model Checkpoint: epoch_100_steps_00046900.pt
+HF_MODEL_NAME: farleyknight/mnist-digit-classification-2022-09-04
+
+=== Approach=mixture, Search=paths ===
+Approach=mixture, Search=paths
+  subset_size=200, accuracy=0.1000
+

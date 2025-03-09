@@ -1,0 +1,15 @@
+=== EXPERIMENT DETAILS ===
+Timestamp: 20250304_035356
+Checkpoints: [100, 400, 500, 600, 700, 800]
+N_CANDIDATES: 64
+verifier_data_sizes: [10, 50, 200]
+n_experiments_per_digit: 5
+Diffusion Model Checkpoint: epoch_100_steps_00046900.pt
+HF_MODEL_NAME: farleyknight/mnist-digit-classification-2022-09-04
+
+=== Approach: mixture ===
+Approach: mixture
+  subset_size=10, accuracy=0.5800
+  subset_size=50, accuracy=0.6400
+  subset_size=200, accuracy=0.5600
+

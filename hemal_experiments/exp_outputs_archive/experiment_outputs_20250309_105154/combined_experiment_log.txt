@@ -1,0 +1,52 @@
+# ============================
+# Script Configuration
+# ============================
+
+MODEL_TYPE = "nlc"  # "lc" or "nlc"
+USE_EMA = True      # If True, load ckpt["model_ema"], else ckpt["model"]
+
+# Path to the trained unconditional diffusion model checkpoint
+CHECKPOINT = "epoch_100_steps_00046900.pt"
+
+# This list is now **only** for the top_k search:
+CHECKPOINTS = [100, 200, 300, 400, 500, 700, 900]
+
+# Approaches
+APPROACHES_TO_TRY = ["mixture"]  # distribution approaches
+SEARCH_METHODS_TO_TRY = ["paths"]  # search methods
+
+# Number of repeated generation attempts per digit
+N_EXPERIMENTS_PER_DIGIT = 50
+
+# Subset sizes for the distribution estimation
+VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800]
+
+# --- Separate numbers of candidates ---
+N_CANDIDATES_TOP_K = 128
+N_CANDIDATES_PATHS = 5
+# --------------------------------------
+
+# If using the "paths" method, define partial forward/backward intervals:
+DELTA_F = 100  # steps to forward-diffuse
+DELTA_B = 200  # steps to reverse-diffuse
+
+# Hugging Face MNIST classifier repository
+HF_MODEL_NAME = "farleyknight/mnist-digit-classification-2022-09-04"
+
+# Data
+MNIST_ROOT = "./mnist_data"
+DEBUG_VISUALIZE_DIGIT = False  # If True, will show a sample digit from the subset
+
+# Where this script resides
+MODEL_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_DIR = os.path.dirname(MODEL_TEST_DIR)
+GPU_ACCELERATED_TRAINING_DIR = os.path.join(REPO_DIR, 'nlc_gpu_accelerated_training')
+TRAINED_MODELS_DIR = os.path.join(REPO_DIR, 'nlc_trained_ddpm', 'results')
+
+DIGIT_ARRAY = list(range(10))
+
+sys.path.append(GPU_ACCELERATED_TRAINING_DIR)
+sys.path.append(TRAINED_MODELS_DIR)
+
+from model import MNISTDiffusion  # Adjust if your model import path is different
+from utils import ExponentialMovingAverage
