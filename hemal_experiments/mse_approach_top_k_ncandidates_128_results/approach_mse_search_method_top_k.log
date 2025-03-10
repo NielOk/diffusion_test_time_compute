@@ -1,0 +1,252 @@
+All logs & figures will be saved to: /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025
+Loading diffusion model from: /home/ubuntu/diffusion_test_time_compute/nlc_trained_ddpm/results/epoch_100_steps_00046900.pt
+Loaded EMA weights from checkpoint.
+Loading Hugging Face model: farleyknight/mnist-digit-classification-2022-09-04
+/home/ubuntu/diffusion_test_time_compute/.venv/lib/python3.10/site-packages/transformers/models/vit/feature_extraction_vit.py:28: FutureWarning: The class ViTFeatureExtractor is deprecated and will be removed in version 5 of Transformers. Please use ViTImageProcessor instead.
+  warnings.warn(
+
+======== Starting scaling study for approach=mse, search=top_k ========
+
+
+=== Running experiments for subset_size=50, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=50, approach=mse, search_method=top_k
+50 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=50 | Accuracy=79.00% (395/500)
+Cache cleared after finishing subset_size=50. Current cache size: 0
+
+=== Running experiments for subset_size=100, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=100, approach=mse, search_method=top_k
+100 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=100 | Accuracy=80.80% (404/500)
+Cache cleared after finishing subset_size=100. Current cache size: 0
+
+=== Running experiments for subset_size=200, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=200, approach=mse, search_method=top_k
+200 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=200 | Accuracy=80.00% (400/500)
+Cache cleared after finishing subset_size=200. Current cache size: 0
+
+=== Running experiments for subset_size=600, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=600, approach=mse, search_method=top_k
+600 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=600 | Accuracy=77.40% (387/500)
+Cache cleared after finishing subset_size=600. Current cache size: 0
+
+=== Running experiments for subset_size=1000, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=1000, approach=mse, search_method=top_k
+1000 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=1000 | Accuracy=78.80% (394/500)
+Cache cleared after finishing subset_size=1000. Current cache size: 0
+
+=== Running experiments for subset_size=1400, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=1400, approach=mse, search_method=top_k
+1400 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=1400 | Accuracy=82.40% (412/500)
+Cache cleared after finishing subset_size=1400. Current cache size: 0
+
+=== Running experiments for subset_size=1800, approach=mse, search=top_k ===
+  -> Computing distribution for digit=0, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 0
+   [Digit 0] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=1, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 1
+   [Digit 1] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=2, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 2
+   [Digit 2] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=3, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 3
+   [Digit 3] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=4, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 4
+   [Digit 4] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=5, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 5
+   [Digit 5] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=6, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 6
+   [Digit 6] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=7, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 7
+   [Digit 7] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=8, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 8
+   [Digit 8] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  -> Computing distribution for digit=9, subset_size=1800, approach=mse, search_method=top_k
+1800 sample images loaded for digit 9
+   [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
+  => Approach=MSE | Search=top_k | subset_size=1800 | Accuracy=82.80% (414/500)
+Cache cleared after finishing subset_size=1800. Current cache size: 0
+Saved scaling study plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025/scaling_study_accuracy_mse_top_k.png
+
+All experiments complete. Detailed logs saved to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025/combined_experiment_log.txt
+Done!
+Note: For 'paths' search, distribution info was computed for timesteps=[799, 699, 599, 499, 399, 299, 199, 99, 0]
