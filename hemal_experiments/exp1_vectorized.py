@@ -52,7 +52,7 @@ USE_EMA = True      # If True, load ckpt["model_ema"], else ckpt["model"]
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # This list is now **only** for the top_k search:
-CHECKPOINTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+CHECKPOINTS = [100, 200, 300, 400, 500, 700, 900]
 
 # Approaches
 APPROACHES_TO_TRY = ["mse", "mixture"]  # distribution approaches
@@ -62,7 +62,7 @@ SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 N_EXPERIMENTS_PER_DIGIT = 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
+VERIFIER_DATA_SIZES = [50, 100, 200, 600, 1000, 1400, 1800]
 
 # --- Separate numbers of candidates ---
 N_CANDIDATES_TOP_K = 128 # 512
@@ -654,7 +654,7 @@ def generate_samples_for_digit(
             print(f"   [Digit {digit}] Generating {n_experiments - len(out_samples)} samples through sample number {n_experiments} "
                   f"with approach={approach}, search={search_method}")
         else:
-            print(f"    [Digit {digit}] Generating {batch_size} samples through sample number {(batch_idx + 1)*batch_size}/{num_batches} "
+            print(f"    [Digit {digit}] Generating {batch_size} samples through sample number {(batch_idx + 1)*batch_size} "
               f"with approach={approach}, search={search_method}")
             
         batch_noise = perform_search(

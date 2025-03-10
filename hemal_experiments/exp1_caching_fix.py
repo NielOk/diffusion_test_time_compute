@@ -45,7 +45,7 @@ USE_EMA = True      # If True, load ckpt["model_ema"], else ckpt["model"]
 CHECKPOINT = "epoch_100_steps_00046900.pt"
 
 # This list is now **only** for the top_k search:
-CHECKPOINTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+CHECKPOINTS = [100, 200, 300, 400, 500, 700, 900]
 
 # Approaches
 APPROACHES_TO_TRY = ["mse", "mixture"]  # distribution approaches
@@ -450,6 +450,7 @@ def search_over_paths(
     for ckpt_t in rev_checkpoints:
         # Reverse diffuse from t_current down to ckpt_t
         while t_current > ckpt_t:
+            print(t_current)
             t_tensor = torch.full((candidates.shape[0],), t_current, device=device, dtype=torch.long)
             noise = torch.randn_like(candidates)
             candidates = model._reverse_diffusion(candidates, t_tensor, noise)
