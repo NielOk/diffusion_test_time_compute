@@ -378,7 +378,6 @@ def denoise_to_step(model, candidates, t, start_point, labels, B, K, model_type=
         raise ValueError('model_type must be one of "lc" or "nlc"')
             
     for step in range(start_point, t, -1):
-        print(step)
         t_tensor = torch.full((B * K,), step, device=device, dtype=torch.long)
         noise = torch.randn_like(candidates)
 
