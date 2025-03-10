@@ -299,7 +299,7 @@ def score_candidates(approach, dist_key, t, candidates):
     Returns a 1D tensor of scores (higher is better).
     """
     distribution_data = _distribution_cache[dist_key]
-    B, K, C, H, W = candidates.shape  # 🔹 Ensure we use the latest candidate count `K`
+    B, K, C, H, W = candidates.shape
 
     if approach == "mse":
         if t not in distribution_data:
