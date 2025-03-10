@@ -58,7 +58,7 @@ N_EXPERIMENTS_PER_DIGIT = 50
 VERIFIER_DATA_SIZES = [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
 
 # --- Separate numbers of candidates ---
-N_CANDIDATES_TOP_K = 128
+N_CANDIDATES_TOP_K = 128 # 512
 N_CANDIDATES_PATHS = 5
 # --------------------------------------
 
@@ -125,7 +125,6 @@ def create_digit_dataloader(digit, subset_size=None, batch_size=128, image_size=
     subset = Subset(full_dataset, indices)
 
     if DEBUG_VISUALIZE_DIGIT and len(indices) > 0:
-        import matplotlib.pyplot as plt
         sample_image, sample_label = full_dataset[indices[0]]
         plt.imshow(sample_image.squeeze(), cmap='gray')
         plt.title(f"Sample Digit: {sample_label}")
@@ -297,45 +296,41 @@ def score_candidates(approach, dist_key, t, candidates):
     Returns a 1D tensor of scores (higher is better).
     """
     distribution_data = _distribution_cache[dist_key]
+    B, K, C, H, W = candidates.shape  # 🔹 Ensure we use the latest candidate count `K`
 
     if approach == "mse":
         if t not in distribution_data:
             return None
         target_t = distribution_data[t]  # shape [1,1,28,28]
-        target = target_t.expand(candidates.shape[0], -1, -1, -1)
-        # Negative MSE
-        scores = -F.mse_loss(candidates, target, reduction='none').mean(dim=[1,2,3])
-        return scores
+        target = target_t.expand(B, K, -1, -1, -1).reshape(B * K, C, H, W)  # 🔹 Correct expansion
+        scores = -F.mse_loss(candidates.view(B * K, C, H, W), target, reduction='none').mean(dim=[1,2,3])
+        return scores.view(B, K)  # 🔹 Reshape scores back to (B, K)
 
     elif approach == "bayes":
         posterior_means, posterior_vars = distribution_data
         if t not in posterior_means:
             return None
-        mu_t = posterior_means[t].expand(candidates.shape[0], -1, -1, -1)
+        mu_t = posterior_means[t].expand(B, K, -1, -1, -1).reshape(B * K, C, H, W)  # 🔹 Correct expansion
         var_t = posterior_vars[t]  # scalar float
-        # Negative squared error / (2 * var_t)
-        squared_errors = F.mse_loss(candidates, mu_t, reduction='none').mean(dim=[1,2,3])
+        squared_errors = F.mse_loss(candidates.view(B * K, C, H, W), mu_t, reduction='none').mean(dim=[1,2,3])
         scores = -squared_errors / (2.0 * var_t)
-        return scores
+        return scores.view(B, K)  # 🔹 Reshape back to (B, K)
 
     elif approach == "mixture":
         if t not in distribution_data:
             return None
         mus, var_t = distribution_data[t]  # mus: [N,1,28,28], var_t: float
-        batch_size = candidates.shape[0]
-        c_expanded = candidates.unsqueeze(1)  # [batch,1,1,28,28]
-        m_expanded = mus.unsqueeze(0)         # [1,N,1,28,28]
+        c_expanded = candidates.view(B, K, C, H, W).unsqueeze(2)  # 🔹 (B, K, 1, C, H, W)
+        m_expanded = mus.unsqueeze(0).unsqueeze(0)  # 🔹 (1, 1, N, C, H, W)
         diff = c_expanded - m_expanded
-        # Mean across spatial dims
-        sq_dist = diff.pow(2).mean(dim=[2,3,4])  # [batch, N]
+        sq_dist = diff.pow(2).mean(dim=[3,4,5])  # 🔹 (B, K, N)
         exponent = -sq_dist / (2.0 * var_t)
-        # Log-sum-exp across mixture dimension
-        max_exponent, _ = exponent.max(dim=1, keepdim=True)
+        max_exponent, _ = exponent.max(dim=2, keepdim=True)
         exponent_shifted = exponent - max_exponent
-        sum_exp = torch.exp(exponent_shifted).sum(dim=1)
+        sum_exp = torch.exp(exponent_shifted).sum(dim=2)
         mixture_sum = (1.0 / mus.shape[0]) * torch.exp(max_exponent.squeeze()) * sum_exp
         ll = torch.log(mixture_sum + 1e-12)
-        return ll
+        return ll.view(B, K)  # 🔹 Reshape back to (B, K)
 
     else:
         raise ValueError(f"Unknown approach: {approach}")
@@ -348,39 +343,53 @@ def score_candidates(approach, dist_key, t, candidates):
 # CHANGED: `top_k_search` now takes `dist_key`, not `distribution_data`,
 # and calls `score_candidates(approach, dist_key, t, ...)`.
 ##
-def top_k_search(model, dist_key, approach, n_candidates=64, device="cuda"):
+def top_k_search(model, dist_key, approach, n_candidates=64, device="cuda", batch_size=16):
     """
     'Top-K' search:
      - Reverse-diffuse from t=T-1 down to 0
      - Prune half the candidates at each step if distribution is available
      - Return the single best candidate
     """
-    candidates = torch.randn(
-        (n_candidates, model.in_channels, model.image_size, model.image_size),
-        device=device
-    )
+    candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
 
     for t in range(model.timesteps - 1, -1, -1):
-        t_tensor = torch.full((candidates.shape[0],), t, device=device, dtype=torch.long)
+        B, K, C, H, W = candidates.shape
+        t_tensor = torch.full((B * K,), t, device=device, dtype=torch.long)
+        # Flatten candidates from (batch_size, n_candidates, C, H, W) → (batch_size * n_candidates, C, H, W)
+        candidates = candidates.view(B * K, C, H, W)
         noise = torch.randn_like(candidates)
         candidates = model._reverse_diffusion(candidates, t_tensor, noise)
+
+        # Unflatten candidates from (batch_size * n_candidates, C, H, W) → (batch_size, n_candidates, C, H, W)
+        candidates = candidates.view(B, K, C, H, W)
 
         # Prune if we have distribution data for this t
         scores_t = score_candidates(approach, dist_key, t, candidates)
         if scores_t is not None:
-            k = max(1, candidates.shape[0] // 2)
-            topk_indices = torch.topk(scores_t, k=k).indices
-            candidates = candidates[topk_indices]
+            k = max(1, K // 2)  # Reduce candidates
+            topk_indices = torch.topk(scores_t, k=k, dim=1).indices  # Shape: (B, k)
 
+            # Gather top-k candidates per batch
+            candidates = torch.gather(
+                candidates, dim=1,
+                index=topk_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, C, H, W)
+            )
+
+            K = k  # Update K dynamically after pruning
+
+    candidates = candidates.view(B, K, C, H, W)
     # Final pick from the last batch
     scores_final = score_candidates(approach, dist_key, 0, candidates)
     if scores_final is not None:
-        best_idx = torch.argmax(scores_final)
-        best_candidate = candidates[best_idx]
+        best_indices = torch.argmax(scores_final, dim=1)
+        
+        # Select the best candidate per batch
+        best_candidates = candidates[torch.arange(B, device=device), best_indices]
     else:
-        best_candidate = candidates[0]
+        # Select the first candidate for each batch
+        best_candidates = candidates[:, 0]
 
-    return best_candidate
+    return best_candidates
 
 # ============================
 # Search Method #2 (Paths)
@@ -429,7 +438,8 @@ def search_over_paths(
     n_candidates=64,
     device="cuda",
     delta_f=30,
-    delta_b=60
+    delta_b=60,
+    batch_size=16
 ):
     """
     'Paths' search:
@@ -440,27 +450,38 @@ def search_over_paths(
       5) Return best candidate
     """
     t_current = model.timesteps - 1
-    candidates = torch.randn(
-        (n_candidates, model.in_channels, model.image_size, model.image_size),
-        device=device
-    )
+    candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
 
     rev_checkpoints = get_path_checkpoints(model.timesteps, delta_f, delta_b)
 
     for ckpt_t in rev_checkpoints:
+        print(candidates.shape)
+
         # Reverse diffuse from t_current down to ckpt_t
+        B, K, C, H, W = candidates.shape
         while t_current > ckpt_t:
-            t_tensor = torch.full((candidates.shape[0],), t_current, device=device, dtype=torch.long)
+            print(t_current)
+            t_tensor = torch.full((B * K,), t_current, device=device, dtype=torch.long)
+            # Flatten candidates from (batch_size, n_candidates, C, H, W) → (batch_size * n_candidates, C, H, W)
+            candidates = candidates.view(B * K, C, H, W)
             noise = torch.randn_like(candidates)
+
             candidates = model._reverse_diffusion(candidates, t_tensor, noise)
             t_current -= 1
+
+        # Unflatten candidates from (batch_size * n_candidates, C, H, W) → (batch_size, n_candidates, C, H, W)
+        candidates = candidates.view(B, K, C, H, W)
 
         # Score & prune (if we have data for ckpt_t)
         scores_ckpt = score_candidates(approach, dist_key, ckpt_t, candidates)
         if scores_ckpt is not None:
-            k = min(candidates.shape[0], n_candidates)
-            topk_indices = torch.topk(scores_ckpt, k=k).indices
-            candidates = candidates[topk_indices]
+            k = min(K, n_candidates)
+            topk_indices = torch.topk(scores_ckpt, k=k, dim=1).indices  # Shape: (B, k)
+            # Gather top-k candidates per batch
+            candidates = torch.gather(
+                candidates, dim=1,
+                index=topk_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, C, H, W)
+            )
 
         # If we've reached t=0, no forward step needed
         if ckpt_t == 0:
@@ -468,7 +489,8 @@ def search_over_paths(
 
         # Forward diffuse from ckpt_t to ckpt_t + delta_f
         next_ckpt = ckpt_t + delta_f
-        candidates = candidates.repeat_interleave(n_candidates, dim=0)
+        # Expand candidates per batch correctly (repeat along candidate dimension)
+        candidates = candidates.repeat_interleave(n_candidates, dim=1)  # Expands (B, K, C, H, W) -> (B, K * n_candidates, C, H, W)
 
         noise = torch.randn_like(candidates)
         candidates = _partial_forward_diffusion(
@@ -483,12 +505,33 @@ def search_over_paths(
     # Final pick
     scores_final = score_candidates(approach, dist_key, 0, candidates)
     if scores_final is not None:
-        best_idx = torch.argmax(scores_final)
-        best_candidate = candidates[best_idx]
+        best_indices = torch.argmax(scores_final, dim=1)  # Per batch
+        best_candidates = candidates[torch.arange(B, device=device), best_indices]
     else:
-        best_candidate = candidates[0]
+        best_candidates = candidates[:, 0]
 
-    return best_candidate
+    # Draw best_candidates
+    # Ensure best_candidates is detached and moved to CPU
+    best_images = (best_candidates.squeeze().detach().cpu().numpy() + 1.0) / 2.0  # Normalize to [0,1]
+
+    B = best_images.shape[0]  # Number of images in batch
+
+    # Plot all best candidates in a grid
+    fig, axes = plt.subplots(1, B, figsize=(B * 2, 2))  # Adjust figure size dynamically
+
+    for i in range(B):
+        ax = axes[i] if B > 1 else axes  # Handle single image case
+        ax.imshow(best_images[i], cmap='gray')
+        ax.set_title(f"Best Image {i+1}")
+        ax.axis('off')  # Hide axis for better visualization
+
+    # Save the figure instead of showing it (avoiding interactive mode issues)
+    save_path = os.path.join(LOG_DIR, "best_candidates.png")
+    plt.savefig(save_path)
+    print(f"Saved best candidates to {save_path}")
+    plt.close(fig)  # Close to avoid memory leaks
+
+    return best_candidates
 
 # ============================
 # Distribution Checkpoints
@@ -515,7 +558,7 @@ def get_distribution_checkpoints_for_search(model, search_method):
 # CHANGED: Now `perform_search` expects `dist_key` in place of `distribution_data`.
 # We look up distribution inside `score_candidates` via `_distribution_cache[dist_key]`.
 ##
-def perform_search(model, dist_key, approach, device, search_method_name="top_k"):
+def perform_search(model, dist_key, approach, device, search_method_name="top_k", batch_size=16):
     """
     Calls either 'top_k_search' or 'search_over_paths', passing the dist_key
     so that scoring can fetch distribution data from `_distribution_cache`.
@@ -526,7 +569,8 @@ def perform_search(model, dist_key, approach, device, search_method_name="top_k"
             dist_key=dist_key,
             approach=approach,
             n_candidates=N_CANDIDATES_TOP_K,
-            device=device
+            device=device,
+            batch_size=batch_size
         )
     elif search_method_name == "paths":
         return search_over_paths(
@@ -536,7 +580,8 @@ def perform_search(model, dist_key, approach, device, search_method_name="top_k"
             n_candidates=N_CANDIDATES_PATHS,
             device=device,
             delta_f=DELTA_F,
-            delta_b=DELTA_B
+            delta_b=DELTA_B,
+            batch_size=batch_size
         )
     else:
         raise ValueError(f"Unknown search method: {search_method_name}")
@@ -593,20 +638,30 @@ def generate_samples_for_digit(
               f"subset_size={verifier_data_subset_size}, approach={approach}, search_method={search_method}")
 
     out_samples = []
-    for exp_idx in range(n_experiments):
-        print(f"    [Digit {digit}] Generating sample {exp_idx+1}/{n_experiments} "
+    if search_method == "top_k":
+        batch_size = min(n_experiments, 16)  # Generate up to 16 images at a time
+    if search_method == "paths":
+        batch_size = min(n_experiments, 8)  # Generate up to 8 images at a time
+
+    num_batches = n_experiments // batch_size
+    for batch_idx in range(num_batches):
+        if batch_idx == num_batches - 1:
+            print(f"   [Digit {digit}] Generating {n_experiments % batch_size} samples through sample number {n_experiments} "
+                  f"with approach={approach}, search={search_method}")
+        else:
+            print(f"    [Digit {digit}] Generating {batch_size} samples through sample number {(batch_idx + 1)*batch_size}/{num_batches} "
               f"with approach={approach}, search={search_method}")
-        ##
-        # CHANGED: pass dist_key into perform_search
-        ##
-        best_noise = perform_search(
+            
+        batch_noise = perform_search(
             model=model,
             dist_key=dist_key,
             approach=approach,
             device=device,
-            search_method_name=search_method
+            search_method_name=search_method,
+            batch_size=batch_size
         )
-        out_samples.append((best_noise.unsqueeze(0), digit))
+        for img in batch_noise:
+            out_samples.append((img.unsqueeze(0), digit))
 
     return out_samples
 
