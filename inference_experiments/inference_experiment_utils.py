@@ -256,47 +256,44 @@ def estimate_target_distribution_mixture(model, digit_loader, digit, checkpoints
 def score_candidates(approach, distribution_data, t, candidates):
     """
     Compute the score for each candidate at time step t,
-    given the distribution_data and chosen 'approach'.
-    Return a 1D tensor of scores (higher is better).
+    by using the distribution data and the specified approach.
+    Returns a 1D tensor of scores (higher is better).
     """
+    B, K, C, H, W = candidates.shape
+
     if approach == "mse":
         if t not in distribution_data:
             return None
         target_t = distribution_data[t]  # shape [1,1,28,28]
-        target = target_t.expand(candidates.shape[0], -1, -1, -1)
-        # Negative MSE
-        scores = -F.mse_loss(candidates, target, reduction='none').mean(dim=[1,2,3])
-        return scores
+        target = target_t.expand(B, K, -1, -1, -1).reshape(B * K, C, H, W)  # 🔹 Correct expansion
+        scores = -F.mse_loss(candidates.view(B * K, C, H, W), target, reduction='none').mean(dim=[1,2,3])
+        return scores.view(B, K)  # 🔹 Reshape scores back to (B, K)
 
     elif approach == "bayes":
         posterior_means, posterior_vars = distribution_data
         if t not in posterior_means:
             return None
-        mu_t = posterior_means[t].expand(candidates.shape[0], -1, -1, -1)
+        mu_t = posterior_means[t].expand(B, K, -1, -1, -1).reshape(B * K, C, H, W)  # 🔹 Correct expansion
         var_t = posterior_vars[t]  # scalar float
-        # Negative squared error / (2 * var_t)
-        squared_errors = F.mse_loss(candidates, mu_t, reduction='none').mean(dim=[1,2,3])
+        squared_errors = F.mse_loss(candidates.view(B * K, C, H, W), mu_t, reduction='none').mean(dim=[1,2,3])
         scores = -squared_errors / (2.0 * var_t)
-        return scores
+        return scores.view(B, K)  # 🔹 Reshape back to (B, K)
 
     elif approach == "mixture":
         if t not in distribution_data:
             return None
         mus, var_t = distribution_data[t]  # mus: [N,1,28,28], var_t: float
-        batch_size = candidates.shape[0]
-        c_expanded = candidates.unsqueeze(1)  # [batch,1,1,28,28]
-        m_expanded = mus.unsqueeze(0)         # [1,N,1,28,28]
+        c_expanded = candidates.view(B, K, C, H, W).unsqueeze(2)  # 🔹 (B, K, 1, C, H, W)
+        m_expanded = mus.unsqueeze(0).unsqueeze(0)  # 🔹 (1, 1, N, C, H, W)
         diff = c_expanded - m_expanded
-        # Mean across spatial dims
-        sq_dist = diff.pow(2).mean(dim=[2,3,4])  # [batch, N]
+        sq_dist = diff.pow(2).mean(dim=[3,4,5])  # 🔹 (B, K, N)
         exponent = -sq_dist / (2.0 * var_t)
-        # Log-sum-exp trick across the mixture dimension
-        max_exponent, _ = exponent.max(dim=1, keepdim=True)
+        max_exponent, _ = exponent.max(dim=2, keepdim=True)
         exponent_shifted = exponent - max_exponent
-        sum_exp = torch.exp(exponent_shifted).sum(dim=1)
+        sum_exp = torch.exp(exponent_shifted).sum(dim=2)
         mixture_sum = (1.0 / mus.shape[0]) * torch.exp(max_exponent.squeeze()) * sum_exp
         ll = torch.log(mixture_sum + 1e-12)
-        return ll
+        return ll.view(B, K)  # 🔹 Reshape back to (B, K)
 
     else:
         raise ValueError(f"Unknown approach: {approach}")
@@ -305,7 +302,7 @@ def score_candidates(approach, distribution_data, t, candidates):
 # ============================
 # Search method #1: (Top-k))
 # ============================
-def top_k_search(model, model_ema, distribution_data, approach, labels, ema=True, use_clip=True, model_type="lc", n_candidates=64, device="cuda"):
+def top_k_search(model, model_ema, distribution_data, approach, labels, batch_size=16, ema=True, use_clip=True, model_type="lc", n_candidates=64, device="cuda"):
     """
     'Top-K' search (formerly known as reverse_diffusion_search).
     Uses the global CHECKPOINTS to prune, step by step, from T-1 down to 0.
@@ -313,13 +310,12 @@ def top_k_search(model, model_ema, distribution_data, approach, labels, ema=True
     if model_type not in ['lc', 'nlc']:
         raise ValueError('model_type must be one of "lc" or "nlc"')
 
-    candidates = torch.randn(
-        (n_candidates, model.in_channels, model.image_size, model.image_size),
-        device=device
-    )
+    candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
 
     for t in range(model.timesteps - 1, -1, -1):
-        t_tensor = torch.full((candidates.shape[0],), t, device=device, dtype=torch.long)
+        B, K, C, H, W = candidates.shape
+        t_tensor = torch.full((B * K,), t, device=device, dtype=torch.long)
+        candidates = candidates.view(B * K, C, H, W)
         noise = torch.randn_like(candidates)
         if model_type == 'lc':
             if ema:
@@ -344,36 +340,48 @@ def top_k_search(model, model_ema, distribution_data, approach, labels, ema=True
                 else:
                     candidates = model._reverse_diffusion(candidates, t_tensor, noise)
 
+        candidates = candidates.view(B, K, C, H, W)
+
         # Prune if we have distribution data for this t
         scores_t = score_candidates(approach, distribution_data, t, candidates)
         if scores_t is not None:
-            k = max(1, candidates.shape[0] // 2)
-            topk_indices = torch.topk(scores_t, k=k).indices
-            candidates = candidates[topk_indices]
+            k = max(1, K // 2)
+            topk_indices = torch.topk(scores_t, k=k, dim=1).indices  # Shape: (B, k)
+            # Gather top-k candidates per batch
+            candidates = torch.gather(
+                candidates, dim=1,
+                index=topk_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, C, H, W)
+            )
+            K = k  # Update K dynamically after pruning
 
+    candidates = candidates.view(B, K, C, H, W)
     # Final pick from the last batch
     scores_final = score_candidates(approach, distribution_data, 0, candidates)
     if scores_final is not None:
-        best_idx = torch.argmax(scores_final)
-        best_candidate = candidates[best_idx]
+        best_indices = torch.argmax(scores_final, dim=1)
+        
+        # Select the best candidate per batch
+        best_candidates = candidates[torch.arange(B, device=device), best_indices]
     else:
-        best_candidate = candidates[0]
+        # Select the first candidate for each batch
+        best_candidates = candidates[:, 0]
 
-    return best_candidate
+    return best_candidates
 
 
 # ======================================
 # Search method #2: (Search-over-paths)
 # ======================================
-def denoise_to_step(model, candidates, t, start_point, labels, model_type="lc", device="cpu", ema=False, use_clip=True):
+def denoise_to_step(model, candidates, t, start_point, labels, B, K, model_type="lc", device="cpu", ema=False, use_clip=True):
 
     if model_type not in ['lc', 'nlc']:
         raise ValueError('model_type must be one of "lc" or "nlc"')
-
+            
     for step in range(start_point, t, -1):
-
-        t_tensor = torch.full((candidates.shape[0],), step, device=device, dtype=torch.long)
+        print(step)
+        t_tensor = torch.full((B * K,), step, device=device, dtype=torch.long)
         noise = torch.randn_like(candidates)
+
         if model_type == 'lc':
             if ema:
                 if use_clip:
@@ -414,7 +422,7 @@ def get_checkpoints(delta_f, delta_b, num_steps=1000):
 
     return checkpoints
 
-def search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, distribution_data, model_type="lc", ema=False, use_clip=True, device='cpu', scoring_approach='mean_distribution_accuracy'):
+def search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, distribution_data, batch_size=16, model_type="lc", ema=False, use_clip=True, device='cpu', scoring_approach='mean_distribution_accuracy'):
     if delta_f > delta_b:
         raise ValueError("delta_f must be less than delta_b.")
     
@@ -425,58 +433,74 @@ def search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to
         raise ValueError('scoring_approach must be one of "mse", "bayes", or "mixture"')
     
     # Get first set of candidates
-    candidates = torch.randn((n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
+    candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
 
     # Right up until the last checkpoint
     t = model.timesteps - 1
     while (t - delta_b) >= 0:
 
+        B, K, C, H, W = candidates.shape
+        candidates = candidates.view(B * K, C, H, W)
+
         noise = torch.randn_like(candidates, device=device)
-        labels = torch.full((candidates.shape[0],), digit_to_generate, dtype=torch.long, device=device)
+        labels = torch.full((B * K,), digit_to_generate, device=device, dtype=torch.long)
 
         # Denoise candidates to checkpoint
         if ema:
-            candidates = denoise_to_step(model_ema, candidates, t - delta_b, t, labels, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
+            candidates = denoise_to_step(model_ema, candidates, t - delta_b, t, labels, B, K, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
         else:
-            candidates = denoise_to_step(model, candidates, t - delta_b, t, labels, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
+            candidates = denoise_to_step(model, candidates, t - delta_b, t, labels, B, K, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
+
+        candidates = candidates.view(B, K, C, H, W)
 
         t -= delta_b
         # Select top n candidates at checkpoint with scoring method
         scores_ckpt = score_candidates(scoring_approach, distribution_data, t, candidates)
-        k = min(candidates.shape[0], n_candidates)
-        topk_indices = torch.topk(scores_ckpt, k=k).indices
-        candidates = candidates[topk_indices]
+        k = min(K, n_candidates)
+        topk_indices = torch.topk(scores_ckpt, k=k, dim=1).indices  # Shape: (B, k)
+        # Gather top-k candidates per batch
+        candidates = torch.gather(
+            candidates, dim=1,
+            index=topk_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, C, H, W)
+        )
+        K = k # Update K dynamically after pruning
 
-        print(f'Finished timestep {t}, kept {candidates.shape[0]} candidates.')
+        print(f'Finished timestep {t}, kept {K} candidates per batch')
 
         # Expand each top candidate to n copies before renoising
-        candidates = candidates.repeat_interleave(n_candidates, dim=0)  # Expands from n to n*10
+        candidates = candidates.repeat_interleave(n_candidates, dim=1)  # Expands from n to n*10
+        K = K * n_candidates  # Update K to reflect the new candidate count
+
+        candidates = candidates.view(B * K, C, H, W)
         noise = torch.randn_like(candidates, device=device)  # Generate fresh noise for each expanded candidate
 
         # Renoise candidates
         candidates = model._partial_forward_diffusion(
             candidates,
-            torch.full((candidates.shape[0],), t, dtype=torch.long, device=candidates.device),
-            torch.full((candidates.shape[0],), t + delta_f, dtype=torch.long, device=candidates.device),
+            torch.full((B * K,), t, device=device, dtype=torch.long),
+            torch.full((B * K,), t + delta_f, device=device, dtype=torch.long),
             noise
         )
+        candidates = candidates.view(B, K, C, H, W)
 
         t += delta_f
 
+    candidates = candidates.view(B * K, C, H, W)
     # Last checkpoint, denoise candidate to step 0
     noise = torch.randn_like(candidates, device=device)
-    labels = torch.full((candidates.shape[0],), digit_to_generate, dtype=torch.long, device=device)
+    labels = torch.full((B * K,), digit_to_generate, device=device, dtype=torch.long)
     if ema:
-        candidates = denoise_to_step(model_ema, candidates, 0, t, labels, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
+        candidates = denoise_to_step(model_ema, candidates, 0, t, labels, B, K, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
     else:
-        candidates = denoise_to_step(model, candidates, 0, t, labels, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
+        candidates = denoise_to_step(model, candidates, 0, t, labels, B, K, model_type=model_type, device=device, ema=ema, use_clip=use_clip)
 
     # Select best candidate
+    candidates = candidates.view(B, K, C, H, W)
     scores_0 = score_candidates(scoring_approach, distribution_data, 0, candidates)
-    best_idx = torch.argmax(scores_0)
-    best_candidate = candidates[best_idx]
+    best_indices = torch.argmax(scores_0, dim=1)
+    best_candidates = candidates[torch.arange(B, device=device), best_indices]
 
-    return best_candidate
+    return best_candidates
 
 # ============================
 # Search Dispatcher
