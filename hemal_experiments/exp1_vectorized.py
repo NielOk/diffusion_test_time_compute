@@ -290,10 +290,6 @@ def estimate_target_distribution_mixture(model, digit_loader, digit, checkpoints
 # Scoring Function
 # ============================
 
-##
-# CHANGED: Now `score_candidates` takes dist_key, looks up the distribution data,
-# and then proceeds.
-##
 def score_candidates(approach, dist_key, t, candidates):
     """
     Compute the score for each candidate at time step t,
@@ -514,27 +510,6 @@ def search_over_paths(
         best_candidates = candidates[torch.arange(B, device=device), best_indices]
     else:
         best_candidates = candidates[:, 0]
-
-    # Draw best_candidates
-    # Ensure best_candidates is detached and moved to CPU
-    best_images = (best_candidates.squeeze().detach().cpu().numpy() + 1.0) / 2.0  # Normalize to [0,1]
-
-    B = best_images.shape[0]  # Number of images in batch
-
-    # Plot all best candidates in a grid
-    fig, axes = plt.subplots(1, B, figsize=(B * 2, 2))  # Adjust figure size dynamically
-
-    for i in range(B):
-        ax = axes[i] if B > 1 else axes  # Handle single image case
-        ax.imshow(best_images[i], cmap='gray')
-        ax.set_title(f"Best Image {i+1}")
-        ax.axis('off')  # Hide axis for better visualization
-
-    # Save the figure instead of showing it (avoiding interactive mode issues)
-    save_path = os.path.join(LOG_DIR, "best_candidates.png")
-    plt.savefig(save_path)
-    print(f"Saved best candidates to {save_path}")
-    plt.close(fig)  # Close to avoid memory leaks
 
     return best_candidates
 
