@@ -1,3 +1,10 @@
+'''
+Vectorized experiment 1 code.
+
+To run this experiment, use the following command:
+nohup python -u exp1_caching_fix.py  --approach $approach --search_method $search_method > approach_${approach}_search_method_${search_method}.log 2>&1 &
+'''
+
 import torch
 import torch.nn.functional as F
 import matplotlib
@@ -455,12 +462,10 @@ def search_over_paths(
     rev_checkpoints = get_path_checkpoints(model.timesteps, delta_f, delta_b)
 
     for ckpt_t in rev_checkpoints:
-        print(candidates.shape)
 
         # Reverse diffuse from t_current down to ckpt_t
         B, K, C, H, W = candidates.shape
         while t_current > ckpt_t:
-            print(t_current)
             t_tensor = torch.full((B * K,), t_current, device=device, dtype=torch.long)
             # Flatten candidates from (batch_size, n_candidates, C, H, W) → (batch_size * n_candidates, C, H, W)
             candidates = candidates.view(B * K, C, H, W)
@@ -639,14 +644,14 @@ def generate_samples_for_digit(
 
     out_samples = []
     if search_method == "top_k":
-        batch_size = min(n_experiments, 16)  # Generate up to 16 images at a time
+        batch_size = min(n_experiments, 50)  # Generate up to 16 images at a time
     if search_method == "paths":
-        batch_size = min(n_experiments, 8)  # Generate up to 8 images at a time
+        batch_size = min(n_experiments, 10)  # Generate up to 8 images at a time
 
     num_batches = n_experiments // batch_size
     for batch_idx in range(num_batches):
         if batch_idx == num_batches - 1:
-            print(f"   [Digit {digit}] Generating {n_experiments % batch_size} samples through sample number {n_experiments} "
+            print(f"   [Digit {digit}] Generating {n_experiments - len(out_samples)} samples through sample number {n_experiments} "
                   f"with approach={approach}, search={search_method}")
         else:
             print(f"    [Digit {digit}] Generating {batch_size} samples through sample number {(batch_idx + 1)*batch_size}/{num_batches} "
@@ -672,7 +677,7 @@ def run_scaling_study(
     diffusion_model,
     hf_model,
     feature_extractor,
-    verifier_data_size=10,
+    verifier_data_sizes=[50, 100, 200],
     approach="mse",
     search_method="top_k",
     n_experiments_per_digit=3,
@@ -684,53 +689,54 @@ def run_scaling_study(
     """
     results = {}
 
-    print(f"\n=== Running experiments for subset_size={verifier_data_size}, approach={approach}, "
-            f"search={search_method} ===")
+    for verifier_data_size in verifier_data_sizes:
+        print(f"\n=== Running experiments for subset_size={verifier_data_size}, approach={approach}, "
+                f"search={search_method} ===")
 
-    generated_samples = []
-    for digit in range(10):
-        digit_samples = generate_samples_for_digit(
-            model=diffusion_model,
-            digit=digit,
-            verifier_data_subset_size=verifier_data_size,
-            approach=approach,
-            search_method=search_method,
-            n_experiments=n_experiments_per_digit,
-            device=device
-        )
-        generated_samples.extend(digit_samples)
+        generated_samples = []
+        for digit in range(10):
+            digit_samples = generate_samples_for_digit(
+                model=diffusion_model,
+                digit=digit,
+                verifier_data_subset_size=verifier_data_size,
+                approach=approach,
+                search_method=search_method,
+                n_experiments=n_experiments_per_digit,
+                device=device
+            )
+            generated_samples.extend(digit_samples)
 
-    # Classify
-    all_images = torch.cat([item[0] for item in generated_samples], dim=0)
-    all_intended_digits = np.array([item[1] for item in generated_samples], dtype=int)
+        # Classify
+        all_images = torch.cat([item[0] for item in generated_samples], dim=0)
+        all_intended_digits = np.array([item[1] for item in generated_samples], dtype=int)
 
-    predicted_labels = classify_generated_images_hf(all_images, hf_model, feature_extractor, device=device)
+        predicted_labels = classify_generated_images_hf(all_images, hf_model, feature_extractor, device=device)
 
-    correct = np.sum(predicted_labels == all_intended_digits)
-    total = len(all_intended_digits)
-    accuracy = correct / total
+        correct = np.sum(predicted_labels == all_intended_digits)
+        total = len(all_intended_digits)
+        accuracy = correct / total
 
-    print(f"  => Approach={approach.upper()} | Search={search_method} | "
-            f"subset_size={verifier_data_size} | Accuracy={accuracy*100:.2f}% ({correct}/{total})")
+        print(f"  => Approach={approach.upper()} | Search={search_method} | "
+                f"subset_size={verifier_data_size} | Accuracy={accuracy*100:.2f}% ({correct}/{total})")
 
-    results[verifier_data_size] = accuracy
+        results[verifier_data_size] = accuracy
 
-    # Optionally, save confusion matrix
-    cm = confusion_matrix(all_intended_digits, predicted_labels, labels=list(range(10)))
-    plt.figure(figsize=(6,5))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                xticklabels=range(10), yticklabels=range(10))
-    plt.xlabel("Predicted")
-    plt.ylabel("Intended")
-    plt.title(f"CM (Subset={verifier_data_size}, Approach={approach}, Search={search_method})")
-    cm_path = os.path.join(LOG_DIR, f"cm_{approach}_{search_method}_subset_{verifier_data_size}.png")
-    plt.savefig(cm_path, dpi=150)
-    plt.close()
-        
-    # Clear cache after finishing each subset size
-    _distribution_cache.clear()
-    print(f"Cache cleared after finishing subset_size={verifier_data_size}. "
-            f"Current cache size: {len(_distribution_cache)}")
+        # Optionally, save confusion matrix
+        cm = confusion_matrix(all_intended_digits, predicted_labels, labels=list(range(10)))
+        plt.figure(figsize=(6,5))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                    xticklabels=range(10), yticklabels=range(10))
+        plt.xlabel("Predicted")
+        plt.ylabel("Intended")
+        plt.title(f"CM (Subset={verifier_data_size}, Approach={approach}, Search={search_method})")
+        cm_path = os.path.join(LOG_DIR, f"cm_{approach}_{search_method}_subset_{verifier_data_size}.png")
+        plt.savefig(cm_path, dpi=150)
+        plt.close()
+            
+        # Clear cache after finishing each subset size
+        _distribution_cache.clear()
+        print(f"Cache cleared after finishing subset_size={verifier_data_size}. "
+                f"Current cache size: {len(_distribution_cache)}")
 
     return results
 
@@ -791,7 +797,7 @@ def main():
             diffusion_model=diffusion_model,
             hf_model=hf_model,
             feature_extractor=feature_extractor,
-            verifier_data_size=args.verifier_data_size,
+            verifier_data_sizes=VERIFIER_DATA_SIZES,
             approach=args.approach,
             search_method=args.search_method,
             n_experiments_per_digit=N_EXPERIMENTS_PER_DIGIT,
@@ -832,8 +838,6 @@ if __name__ == "__main__":
                         help="Approach to use")
     parser.add_argument("--search_method", type=str, choices=SEARCH_METHODS_TO_TRY,
                         help="Search method to use")
-    parser.add_argument("--verifier_data_size", type=int, choices=VERIFIER_DATA_SIZES,
-                        help="Verifier data size to use")
     args = parser.parse_args()
 
     main()
