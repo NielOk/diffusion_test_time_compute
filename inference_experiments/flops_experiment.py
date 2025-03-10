@@ -119,13 +119,14 @@ def singular_experiment():
     _distribution_cache[dist_key] = target_distribution
 
     # Search over paths
-    best_candidate = search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, target_distribution, batch_size=2, model_type=model_type, ema=ema, use_clip=use_clip, device=device, scoring_approach=scoring_approach)
+    best_candidates= search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, target_distribution, batch_size=2, model_type=model_type, ema=ema, use_clip=use_clip, device=device, scoring_approach=scoring_approach)
 
     # Draw best candidate
-    best_image = (best_candidate.squeeze().detach().cpu().numpy() + 1.0) / 2.0
-    plt.imshow(best_image, cmap='gray')
-    plt.title("Best Generated Image")
-    plt.show()
+    for best_candidate in best_candidates:
+        best_image = (best_candidate.squeeze().detach().cpu().numpy() + 1.0) / 2.0
+        plt.imshow(best_image, cmap='gray')
+        plt.title("Best Generated Image")
+        plt.show()
 
 if __name__ == '__main__':
     singular_experiment()
