@@ -8,6 +8,7 @@ import os
 import sys
 import datetime
 import argparse
+import json
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
@@ -20,21 +21,15 @@ from transformers import AutoModelForImageClassification, AutoFeatureExtractor
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 from scipy.linalg import sqrtm  # For FID
+from collections import defaultdict
 
 """
-MNIST Training set sizes:
+Example for MNIST:
 Digit 0: 5923 examples
 Digit 1: 6742 examples
-Digit 2: 5958 examples
-Digit 3: 6131 examples
-Digit 4: 5842 examples
-Digit 5: 5421 examples
-Digit 6: 5918 examples
-Digit 7: 6265 examples
-Digit 8: 5851 examples
+...
 Digit 9: 5949 examples
 """
-
 
 # ============================
 # Script Configuration
@@ -469,9 +464,6 @@ def top_k_search(model, dist_key, approach, n_candidates=64, device="cuda", batc
 def _partial_forward_diffusion(model, x_t, t_from, t_to, noise):
     """
     Forward-diffuse from time 't_from' to 't_to' (t_to > t_from).
-    Unconditional formula:
-      x_tTo = sqrt( α_cum[t_to]/α_cum[t_from] ) * x_t +
-              sqrt(1 - α_cum[t_to]/α_cum[t_from]) * noise
     """
     if t_to <= t_from:
         return x_t
@@ -722,7 +714,7 @@ def get_test_pil_images_for_digit(digit, num_images_needed):
     images = []
     for img, label in mnist_test:
         if label == digit:
-            images.append(img)  # PIL
+            images.append(img)  # raw PIL
             if len(images) == num_images_needed:
                 break
     return images
@@ -733,13 +725,10 @@ def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda
     gather an equal number of real test-set images per digit, extract features,
     and compute the FID (one big real-vs-generated set).
     """
-    # Convert generated samples to PIL
-    # We'll collect them in a dictionary by digit so we know how many per digit
-    from collections import defaultdict
     gen_by_digit = defaultdict(list)
 
+    # Convert each generated sample to a PIL image and group by digit
     for (torch_img, d) in generated_samples:
-        # Convert to PIL
         arr = torch_img.squeeze(0).detach().cpu().numpy().squeeze()
         arr_255 = (arr + 1.0) / 2.0 * 255.0
         arr_255 = np.clip(arr_255, 0, 255).astype(np.uint8)
@@ -749,10 +738,10 @@ def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda
     all_generated_pil = []
     all_real_pil = []
 
+    # For each digit, gather same count of real test images
     for d in range(10):
         gen_list = gen_by_digit[d]
         num_gen = len(gen_list)
-        # Grab the same number from the real test set
         real_list = get_test_pil_images_for_digit(d, num_gen)
         all_generated_pil.extend(gen_list)
         all_real_pil.extend(real_list)
@@ -855,7 +844,7 @@ def run_scaling_study(
 def plot_scaling_study_results(results_dict, approach="mse", search_method="top_k", show_fid=False):
     """
     Plot accuracy vs. subset_size from results_dict = {subset_size: (acc, fid) or acc}.
-    If show_fid=True, also plot FID on a second figure (or you can adapt as needed).
+    If show_fid=True, also plot FID on a second figure.
     """
     sizes = sorted(results_dict.keys())
     # Check if results are (acc, fid) pairs or just acc
@@ -867,7 +856,7 @@ def plot_scaling_study_results(results_dict, approach="mse", search_method="top_
         accuracies = [results_dict[s] for s in sizes]
         plt.figure()
         plt.plot(sizes, accuracies, marker='o')
-        plt.xlabel("Number of Labeled Examples (per digit) for Verifier")
+        plt.xlabel("Number of Labeled Examples (per digit)")
         plt.ylabel("Classification Accuracy")
         plt.title(f"Approach={approach.upper()}, Search={search_method}: Accuracy vs. Verifier Data Size")
         plot_path = os.path.join(LOG_DIR, f"scaling_study_accuracy_{approach}_{search_method}.png")
@@ -888,7 +877,6 @@ def plot_scaling_study_results(results_dict, approach="mse", search_method="top_
         plot_path_acc = os.path.join(LOG_DIR, f"scaling_study_accuracy_{approach}_{search_method}.png")
         plt.savefig(plot_path_acc, dpi=150)
         plt.close()
-
         print(f"Saved scaling study accuracy plot to {plot_path_acc}")
 
         # If you also want a separate FID plot:
@@ -901,7 +889,6 @@ def plot_scaling_study_results(results_dict, approach="mse", search_method="top_
             plot_path_fid = os.path.join(LOG_DIR, f"scaling_study_fid_{approach}_{search_method}.png")
             plt.savefig(plot_path_fid, dpi=150)
             plt.close()
-
             print(f"Saved scaling study FID plot to {plot_path_fid}")
 
 
@@ -910,9 +897,9 @@ def plot_scaling_study_results(results_dict, approach="mse", search_method="top_
 # ============================
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--approach", type=str, choices=APPROACHES_TO_TRY,
+    parser.add_argument("--approach", type=str, choices=APPROACHES_TO_TRY, default="mse",
                         help="Approach to use")
-    parser.add_argument("--search_method", type=str, choices=SEARCH_METHODS_TO_TRY,
+    parser.add_argument("--search_method", type=str, choices=SEARCH_METHODS_TO_TRY, default="top_k",
                         help="Search method to use")
     args = parser.parse_args()
 
@@ -946,7 +933,7 @@ def main():
         f_log.write(f"Diffusion Model Checkpoint: {CHECKPOINT}\n")
         f_log.write(f"HF_MODEL_NAME: {HF_MODEL_NAME}\n\n")
 
-        # Nested loops over approach & search method (in this code, we do just one combo per run)
+        # Experiment
         print(f"\n======== Starting scaling study for approach={args.approach}, "
               f"search={args.search_method} ========\n")
         f_log.write(f"=== Approach={args.approach}, Search={args.search_method} ===\n")
@@ -964,9 +951,14 @@ def main():
         )
 
         # Plot results (both accuracy and FID if present)
-        plot_scaling_study_results(results, approach=args.approach, search_method=args.search_method, show_fid=True)
+        plot_scaling_study_results(
+            results_dict=results,
+            approach=args.approach,
+            search_method=args.search_method,
+            show_fid=True
+        )
 
-        # Save separate text summary
+        # Write text summary
         approach_result_path = os.path.join(LOG_DIR, f"results_{args.approach}_{args.search_method}.txt")
         with open(approach_result_path, "w") as f_approach:
             f_approach.write(f"Approach={args.approach}, Search={args.search_method}\n")
@@ -977,6 +969,7 @@ def main():
             f_approach.write(f"verifier_data_sizes: {VERIFIER_DATA_SIZES}\n")
             f_approach.write(f"n_experiments_per_digit: {N_EXPERIMENTS_PER_DIGIT}\n")
             f_approach.write("Per-subset results:\n")
+
             for sz, val in results.items():
                 if isinstance(val, tuple):
                     acc, fid_val = val
@@ -994,10 +987,29 @@ def main():
                 f_log.write(f"  subset_size={sz}, accuracy={val:.4f}\n")
         f_log.write("\n")
 
+    # ---------------------------------------------------
+    # Save results to JSON (including FID if present)
+    # ---------------------------------------------------
+    json_path = os.path.join(LOG_DIR, f"results_{args.approach}_{args.search_method}.json")
+    json_data = {}
+    for size, val in results.items():
+        if isinstance(val, tuple):
+            # (acc, fid_val)
+            acc, fid_val = val
+            json_data[size] = {"accuracy": acc, "fid": fid_val}
+        else:
+            json_data[size] = {"accuracy": val, "fid": None}
+
+    with open(json_path, "w") as f_json:
+        json.dump(json_data, f_json, indent=2)
+
     print(f"\nAll experiments complete. Detailed logs saved to {full_log_path}")
+    print(f"Saved JSON results (including FID) to {json_path}")
     print("Done!")
     print(f"Note: For 'paths' search, distribution info was computed for "
           f"timesteps={get_path_checkpoints(diffusion_model.timesteps, DELTA_F, DELTA_B)}")
 
+
 if __name__ == "__main__":
     main()
+
