@@ -1,4 +1,4 @@
-All logs & figures will be saved to: /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025
+All logs & figures will be saved to: /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_041438
 Loading diffusion model from: /home/ubuntu/diffusion_test_time_compute/nlc_trained_ddpm/results/epoch_100_steps_00046900.pt
 Loaded EMA weights from checkpoint.
 Loading Hugging Face model: farleyknight/mnist-digit-classification-2022-09-04
@@ -39,7 +39,7 @@ Loading Hugging Face model: farleyknight/mnist-digit-classification-2022-09-04
   -> Computing distribution for digit=9, subset_size=50, approach=mse, search_method=top_k
 50 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=50 | Accuracy=79.00% (395/500)
+  => Approach=MSE | Search=top_k | subset_size=50 | Accuracy=77.80% (389/500) | FID=0.1524
 Cache cleared after finishing subset_size=50. Current cache size: 0
 
 === Running experiments for subset_size=100, approach=mse, search=top_k ===
@@ -73,7 +73,7 @@ Cache cleared after finishing subset_size=50. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=100, approach=mse, search_method=top_k
 100 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=100 | Accuracy=80.80% (404/500)
+  => Approach=MSE | Search=top_k | subset_size=100 | Accuracy=78.40% (392/500) | FID=0.1573
 Cache cleared after finishing subset_size=100. Current cache size: 0
 
 === Running experiments for subset_size=200, approach=mse, search=top_k ===
@@ -107,7 +107,7 @@ Cache cleared after finishing subset_size=100. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=200, approach=mse, search_method=top_k
 200 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=200 | Accuracy=80.00% (400/500)
+  => Approach=MSE | Search=top_k | subset_size=200 | Accuracy=80.20% (401/500) | FID=0.1410
 Cache cleared after finishing subset_size=200. Current cache size: 0
 
 === Running experiments for subset_size=600, approach=mse, search=top_k ===
@@ -141,7 +141,7 @@ Cache cleared after finishing subset_size=200. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=600, approach=mse, search_method=top_k
 600 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=600 | Accuracy=77.40% (387/500)
+  => Approach=MSE | Search=top_k | subset_size=600 | Accuracy=75.60% (378/500) | FID=0.1466
 Cache cleared after finishing subset_size=600. Current cache size: 0
 
 === Running experiments for subset_size=1000, approach=mse, search=top_k ===
@@ -175,7 +175,7 @@ Cache cleared after finishing subset_size=600. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=1000, approach=mse, search_method=top_k
 1000 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=1000 | Accuracy=78.80% (394/500)
+  => Approach=MSE | Search=top_k | subset_size=1000 | Accuracy=79.40% (397/500) | FID=0.1473
 Cache cleared after finishing subset_size=1000. Current cache size: 0
 
 === Running experiments for subset_size=1400, approach=mse, search=top_k ===
@@ -209,7 +209,7 @@ Cache cleared after finishing subset_size=1000. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=1400, approach=mse, search_method=top_k
 1400 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=1400 | Accuracy=82.40% (412/500)
+  => Approach=MSE | Search=top_k | subset_size=1400 | Accuracy=79.60% (398/500) | FID=0.1556
 Cache cleared after finishing subset_size=1400. Current cache size: 0
 
 === Running experiments for subset_size=1800, approach=mse, search=top_k ===
@@ -243,10 +243,11 @@ Cache cleared after finishing subset_size=1400. Current cache size: 0
   -> Computing distribution for digit=9, subset_size=1800, approach=mse, search_method=top_k
 1800 sample images loaded for digit 9
    [Digit 9] Generating 50 samples through sample number 50 with approach=mse, search=top_k
-  => Approach=MSE | Search=top_k | subset_size=1800 | Accuracy=82.80% (414/500)
+  => Approach=MSE | Search=top_k | subset_size=1800 | Accuracy=79.00% (395/500) | FID=0.1577
 Cache cleared after finishing subset_size=1800. Current cache size: 0
-Saved scaling study plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025/scaling_study_accuracy_mse_top_k.png
+Saved scaling study accuracy plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_041438/scaling_study_accuracy_mse_top_k.png
+Saved scaling study FID plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_041438/scaling_study_fid_mse_top_k.png
 
-All experiments complete. Detailed logs saved to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110025/combined_experiment_log.txt
+All experiments complete. Detailed logs saved to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_041438/combined_experiment_log.txt
 Done!
 Note: For 'paths' search, distribution info was computed for timesteps=[799, 699, 599, 499, 399, 299, 199, 99, 0]

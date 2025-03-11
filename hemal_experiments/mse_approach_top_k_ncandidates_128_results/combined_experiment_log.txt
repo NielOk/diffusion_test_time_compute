@@ -1,5 +1,5 @@
 === EXPERIMENT DETAILS ===
-Timestamp: 20250310_110025
+Timestamp: 20250311_041438
 MODEL_TYPE: nlc
 USE_EMA: True
 Checkpoints (used only for top_k): [100, 200, 300, 400, 500, 700, 900]
@@ -13,12 +13,3 @@ Diffusion Model Checkpoint: epoch_100_steps_00046900.pt
 HF_MODEL_NAME: farleyknight/mnist-digit-classification-2022-09-04
 
 === Approach=mse, Search=top_k ===
-Approach=mse, Search=top_k
-  subset_size=50, accuracy=0.7900
-  subset_size=100, accuracy=0.8080
-  subset_size=200, accuracy=0.8000
-  subset_size=600, accuracy=0.7740
-  subset_size=1000, accuracy=0.7880
-  subset_size=1400, accuracy=0.8240
-  subset_size=1800, accuracy=0.8280
-
