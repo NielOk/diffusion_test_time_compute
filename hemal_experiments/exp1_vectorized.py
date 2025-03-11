@@ -15,9 +15,13 @@ import os
 import sys
 import datetime
 import argparse
+import json
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
+from PIL import Image
+from scipy.linalg import sqrtm  # For FID
+from collections import defaultdict
 
 # Transformers / HF
 from transformers import AutoModelForImageClassification, AutoFeatureExtractor
@@ -59,14 +63,14 @@ APPROACHES_TO_TRY = ["mse", "mixture"]  # distribution approaches
 SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 
 # Number of repeated generation attempts per digit
-N_EXPERIMENTS_PER_DIGIT = 50
+N_EXPERIMENTS_PER_DIGIT = 2 # 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [50, 100, 200, 600, 1000, 1400, 1800]
+VERIFIER_DATA_SIZES = [50]#[50, 100, 200, 600, 1000, 1400, 1800]
 
 # --- Separate numbers of candidates ---
-N_CANDIDATES_TOP_K = 128 # 512
-N_CANDIDATES_PATHS = 5
+N_CANDIDATES_TOP_K = 2 # 128 # 512
+N_CANDIDATES_PATHS = 2 # 5
 # --------------------------------------
 
 # If using the "paths" method, define partial forward/backward intervals:
@@ -107,6 +111,82 @@ print(f"All logs & figures will be saved to: {LOG_DIR}")
 # ============================
 # We'll now key the cache by (digit, subset_size, approach, search_method)
 _distribution_cache = {}
+
+
+# -----------------------------------------------------------------------------
+# 1) FID SUPPORT: MNIST Inception + feature extraction + FID calculation
+# -----------------------------------------------------------------------------
+
+class MnistInceptionModel(torch.nn.Module):
+    """
+    Minimal "Inception-like" model for MNIST, purely for demonstration.
+    Outputs a 128-D penultimate layer for FID calculation.
+    """
+    def __init__(self):
+        super().__init__()
+        self.features_layer = torch.nn.Sequential(
+            torch.nn.Linear(28*28, 128),  # expects 1×28×28 => 784
+            torch.nn.ReLU(),
+        )
+        self.classifier = torch.nn.Linear(128, 10)  # 10 classes for MNIST
+
+    def forward(self, x):
+        """
+        x shape: [batch, 1, 28, 28].
+        We'll flatten, feed to features, then classify.
+        """
+        b, c, h, w = x.shape
+        x = x.view(b, -1)          # shape [b, 784]
+        feats = self.features_layer(x)  # shape [b, 128]
+        logits = self.classifier(feats) # shape [b, 10]
+        return logits, feats
+
+    def features(self, x):
+        """
+        Returns the penultimate-layer (128-D) embeddings.
+        """
+        _, feats = self.forward(x)
+        return feats
+
+def get_mnist_features(images, fid_model, device):
+    """
+    images : list of PIL Images
+    returns: np.array shape [N,128] of penultimate-layer features
+    """
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((28, 28)),
+        transforms.ToTensor(),
+    ])
+    feats_list = []
+    for img in images:
+        img_t = transform(img).unsqueeze(0).to(device)  # shape [1,1,28,28]
+        with torch.no_grad():
+            feats = fid_model.features(img_t)  # shape [1,128]
+        feats_list.append(feats.squeeze(0).cpu().numpy())
+    return np.vstack(feats_list)
+
+def compute_fid(x_feats, y_feats):
+    """
+    Frechet Inception Distance (FID) between two sets of features.
+    x_feats: [N,128]
+    y_feats: [M,128]
+    """
+    mu_x = np.mean(x_feats, axis=0)
+    mu_y = np.mean(y_feats, axis=0)
+    sigma_x = np.cov(x_feats, rowvar=False)
+    sigma_y = np.cov(y_feats, rowvar=False)
+
+    diff = mu_x - mu_y
+    diff_sq = diff.dot(diff)
+
+    cov_prod = sigma_x.dot(sigma_y)
+    cov_sqrt, _ = sqrtm(cov_prod, disp=False)
+    if np.iscomplexobj(cov_sqrt):
+        cov_sqrt = cov_sqrt.real
+
+    fid_val = diff_sq + np.trace(sigma_x + sigma_y - 2 * cov_sqrt)
+    return fid_val
 
 # ============================
 # Helper Functions
@@ -645,6 +725,64 @@ def generate_samples_for_digit(
 
     return out_samples
 
+# -----------------------------------------------------------------------------
+# 2) FID HELPER: Gather real test-set images + compute FID vs. generated
+# -----------------------------------------------------------------------------
+
+def get_test_pil_images_for_digit(digit, num_images_needed):
+    """
+    Gather `num_images_needed` PIL images of the given digit from *test* set (not train).
+    """
+    mnist_test = datasets.MNIST(
+        root=MNIST_ROOT,
+        train=False,
+        download=True,
+        transform=None
+    )
+    images = []
+    for img, label in mnist_test:
+        if label == digit:
+            images.append(img)  # raw PIL
+            if len(images) == num_images_needed:
+                break
+    return images
+
+def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda"):
+    """
+    Given a list of (torch_image, digit) pairs in `generated_samples`,
+    gather an equal number of real test-set images per digit, extract features,
+    and compute the FID (one big real-vs-generated set).
+    """
+    gen_by_digit = defaultdict(list)
+
+    # Convert each generated sample to a PIL image and group by digit
+    for (torch_img, d) in generated_samples:
+        arr = torch_img.squeeze(0).detach().cpu().numpy().squeeze()
+        arr_255 = (arr + 1.0) / 2.0 * 255.0
+        arr_255 = np.clip(arr_255, 0, 255).astype(np.uint8)
+        pil_img = Image.fromarray(arr_255, mode='L')
+        gen_by_digit[d].append(pil_img)
+
+    all_generated_pil = []
+    all_real_pil = []
+
+    # For each digit, gather same count of real test images
+    for d in range(10):
+        gen_list = gen_by_digit[d]
+        num_gen = len(gen_list)
+        real_list = get_test_pil_images_for_digit(d, num_gen)
+        all_generated_pil.extend(gen_list)
+        all_real_pil.extend(real_list)
+
+    # Extract features
+    real_feats = get_mnist_features(all_real_pil, fid_model, device)
+    gen_feats  = get_mnist_features(all_generated_pil, fid_model, device)
+
+    # Compute FID
+    fid_val = compute_fid(real_feats, gen_feats)
+    return fid_val
+
+
 # ============================
 # Scaling Study
 # ============================
@@ -656,7 +794,8 @@ def run_scaling_study(
     approach="mse",
     search_method="top_k",
     n_experiments_per_digit=3,
-    device="cuda"
+    device="cuda",
+    fid_model=None
 ):
     """
     Evaluate classification accuracy for different subset sizes.
@@ -691,10 +830,21 @@ def run_scaling_study(
         total = len(all_intended_digits)
         accuracy = correct / total
 
-        print(f"  => Approach={approach.upper()} | Search={search_method} | "
+        msg = (f"  => Approach={approach.upper()} | Search={search_method} | "
                 f"subset_size={verifier_data_size} | Accuracy={accuracy*100:.2f}% ({correct}/{total})")
+        
+        # Optionally compute FID
+        fid_val = None
+        if fid_model is not None:
+            fid_val = compute_fid_for_generated_samples(generated_samples, fid_model, device=device)
+            msg += f" | FID={fid_val:.4f}"
 
-        results[verifier_data_size] = accuracy
+        print(msg)
+
+        if fid_val is not None:
+            results[verifier_data_size] = (accuracy, fid_val)
+        else:
+            results[verifier_data_size] = accuracy
 
         # Optionally, save confusion matrix
         cm = confusion_matrix(all_intended_digits, predicted_labels, labels=list(range(10)))
@@ -716,22 +866,54 @@ def run_scaling_study(
     return results
 
 
-def plot_scaling_study_results(results_dict, approach="mse", search_method="top_k"):
+def plot_scaling_study_results(results_dict, approach="mse", search_method="top_k", show_fid=False):
     """
     Plot accuracy vs. subset_size from results_dict = {subset_size: accuracy}.
     """
     sizes = sorted(results_dict.keys())
-    accuracies = [results_dict[s] for s in sizes]
+    # Check if results are (acc, fid) pairs or just acc
+    first_val = results_dict[sizes[0]]
+    have_fid = isinstance(first_val, tuple)
 
-    plt.figure()
-    plt.plot(sizes, accuracies, marker='o')
-    plt.xlabel("Number of Labeled Examples (per digit) for Verifier")
-    plt.ylabel("Classification Accuracy")
-    plt.title(f"Approach={approach.upper()}, Search={search_method}: Accuracy vs. Verifier Data Size")
-    plot_path = os.path.join(LOG_DIR, f"scaling_study_accuracy_{approach}_{search_method}.png")
-    plt.savefig(plot_path, dpi=150)
-    plt.close()
-    print(f"Saved scaling study plot to {plot_path}")
+    if not have_fid:
+        # Plot only accuracy
+        accuracies = [results_dict[s] for s in sizes]
+        plt.figure()
+        plt.plot(sizes, accuracies, marker='o')
+        plt.xlabel("Number of Labeled Examples (per digit)")
+        plt.ylabel("Classification Accuracy")
+        plt.title(f"Approach={approach.upper()}, Search={search_method}: Accuracy vs. Verifier Data Size")
+        plot_path = os.path.join(LOG_DIR, f"scaling_study_accuracy_{approach}_{search_method}.png")
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
+        print(f"Saved scaling study plot to {plot_path}")
+    else:
+        # Unpack (acc, fid)
+        accuracies = [results_dict[s][0] for s in sizes]
+        fids       = [results_dict[s][1] for s in sizes]
+
+        # Plot accuracy
+        plt.figure()
+        plt.plot(sizes, accuracies, marker='o')
+        plt.xlabel("Verifier Data Size")
+        plt.ylabel("Classification Accuracy")
+        plt.title(f"[Accuracy] Approach={approach.upper()}, Search={search_method}")
+        plot_path_acc = os.path.join(LOG_DIR, f"scaling_study_accuracy_{approach}_{search_method}.png")
+        plt.savefig(plot_path_acc, dpi=150)
+        plt.close()
+        print(f"Saved scaling study accuracy plot to {plot_path_acc}")
+
+        # If you also want a separate FID plot:
+        if show_fid:
+            plt.figure()
+            plt.plot(sizes, fids, marker='o')
+            plt.xlabel("Verifier Data Size")
+            plt.ylabel("FID (lower is better)")
+            plt.title(f"[FID] Approach={approach.upper()}, Search={search_method}")
+            plot_path_fid = os.path.join(LOG_DIR, f"scaling_study_fid_{approach}_{search_method}.png")
+            plt.savefig(plot_path_fid, dpi=150)
+            plt.close()
+            print(f"Saved scaling study FID plot to {plot_path_fid}")
 
 # ============================
 # Main Experiment
@@ -745,6 +927,10 @@ def main():
 
     # Load Hugging Face classifier
     hf_model, feature_extractor = load_hf_classifier(device=device)
+
+    # Load our MNIST "Inception" for FID
+    fid_inception_model = MnistInceptionModel().to(device)
+    fid_inception_model.eval()
 
     # For logging
     full_log_path = os.path.join(LOG_DIR, "combined_experiment_log.txt")
@@ -776,11 +962,12 @@ def main():
             approach=args.approach,
             search_method=args.search_method,
             n_experiments_per_digit=N_EXPERIMENTS_PER_DIGIT,
-            device=device
+            device=device,
+            fid_model=fid_inception_model
         )
 
         # Plot results
-        plot_scaling_study_results(results, approach=args.approach, search_method=args.search_method)
+        plot_scaling_study_results(results, approach=args.approach, search_method=args.search_method, show_fid=True)
 
         # Save separate text summary
         approach_result_path = os.path.join(LOG_DIR, f"results_{args.approach}_{args.search_method}.txt")
@@ -793,14 +980,39 @@ def main():
             f_approach.write(f"verifier_data_sizes: {VERIFIER_DATA_SIZES}\n")
             f_approach.write(f"n_experiments_per_digit: {N_EXPERIMENTS_PER_DIGIT}\n")
             f_approach.write("Per-subset accuracy results:\n")
-            for sz, acc in results.items():
-                f_approach.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
+            for sz, val in results.items():
+                if isinstance(val, tuple):
+                    acc, fid_val = val
+                    f_approach.write(f"  subset_size={sz}, accuracy={acc:.4f}, FID={fid_val:.4f}\n")
+                else:
+                    f_approach.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
 
-        # Also append to combined log file
-        f_log.write(f"Approach={args.approach}, Search={args.search_method}\n")
-        for sz, acc in results.items():
-            f_log.write(f"  subset_size={sz}, accuracy={acc:.4f}\n")
-        f_log.write("\n")
+        # Now safely append to combined log file
+        with open(os.path.join(LOG_DIR, "combined_experiment_log.txt"), "a") as f_log:
+            f_log.write(f"Approach={args.approach}, Search={args.search_method}\n")
+            for sz, val in results.items():
+                if isinstance(val, tuple):
+                    acc, fid_val = val
+                    f_log.write(f"  subset_size={sz}, accuracy={acc:.4f}, FID={fid_val:.4f}\n")  # Fixed here
+                else:
+                    f_log.write(f"  subset_size={sz}, accuracy={val:.4f}\n")  # Fixed here
+            f_log.write("\n")  # Fixed placement of newline
+
+    # ---------------------------------------------------
+    # Save results to JSON (including FID if present)
+    # ---------------------------------------------------
+    json_path = os.path.join(LOG_DIR, f"results_{args.approach}_{args.search_method}.json")
+    json_data = {}
+    for size, val in results.items():
+        if isinstance(val, tuple):
+            # (acc, fid_val)
+            acc, fid_val = val
+            json_data[size] = {"accuracy": acc, "fid": fid_val}
+        else:
+            json_data[size] = {"accuracy": val, "fid": None}
+
+    with open(json_path, "w") as f_json:
+        json.dump(json_data, f_json, indent=2)
 
     print(f"\nAll experiments complete. Detailed logs saved to {full_log_path}")
     print("Done!")
