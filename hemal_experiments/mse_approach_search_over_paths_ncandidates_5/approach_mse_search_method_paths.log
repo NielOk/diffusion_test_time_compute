@@ -1,4 +1,4 @@
-All logs & figures will be saved to: /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110059
+All logs & figures will be saved to: /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_110604
 Loading diffusion model from: /home/ubuntu/diffusion_test_time_compute/nlc_trained_ddpm/results/epoch_100_steps_00046900.pt
 Loaded EMA weights from checkpoint.
 Loading Hugging Face model: farleyknight/mnist-digit-classification-2022-09-04
@@ -79,7 +79,7 @@ Loading Hugging Face model: farleyknight/mnist-digit-classification-2022-09-04
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=50 | Accuracy=71.60% (358/500)
+  => Approach=MSE | Search=paths | subset_size=50 | Accuracy=74.00% (370/500) | FID=0.2206
 Cache cleared after finishing subset_size=50. Current cache size: 0
 
 === Running experiments for subset_size=100, approach=mse, search=paths ===
@@ -153,7 +153,7 @@ Cache cleared after finishing subset_size=50. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=100 | Accuracy=68.00% (340/500)
+  => Approach=MSE | Search=paths | subset_size=100 | Accuracy=71.80% (359/500) | FID=0.2712
 Cache cleared after finishing subset_size=100. Current cache size: 0
 
 === Running experiments for subset_size=200, approach=mse, search=paths ===
@@ -227,7 +227,7 @@ Cache cleared after finishing subset_size=100. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=200 | Accuracy=71.80% (359/500)
+  => Approach=MSE | Search=paths | subset_size=200 | Accuracy=75.60% (378/500) | FID=0.2369
 Cache cleared after finishing subset_size=200. Current cache size: 0
 
 === Running experiments for subset_size=600, approach=mse, search=paths ===
@@ -301,7 +301,7 @@ Cache cleared after finishing subset_size=200. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=600 | Accuracy=72.00% (360/500)
+  => Approach=MSE | Search=paths | subset_size=600 | Accuracy=72.60% (363/500) | FID=0.2309
 Cache cleared after finishing subset_size=600. Current cache size: 0
 
 === Running experiments for subset_size=1000, approach=mse, search=paths ===
@@ -375,7 +375,7 @@ Cache cleared after finishing subset_size=600. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=1000 | Accuracy=72.80% (364/500)
+  => Approach=MSE | Search=paths | subset_size=1000 | Accuracy=75.20% (376/500) | FID=0.2203
 Cache cleared after finishing subset_size=1000. Current cache size: 0
 
 === Running experiments for subset_size=1400, approach=mse, search=paths ===
@@ -449,7 +449,7 @@ Cache cleared after finishing subset_size=1000. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=1400 | Accuracy=73.40% (367/500)
+  => Approach=MSE | Search=paths | subset_size=1400 | Accuracy=74.40% (372/500) | FID=0.2322
 Cache cleared after finishing subset_size=1400. Current cache size: 0
 
 === Running experiments for subset_size=1800, approach=mse, search=paths ===
@@ -523,10 +523,11 @@ Cache cleared after finishing subset_size=1400. Current cache size: 0
     [Digit 9] Generating 10 samples through sample number 30 with approach=mse, search=paths
     [Digit 9] Generating 10 samples through sample number 40 with approach=mse, search=paths
    [Digit 9] Generating 10 samples through sample number 50 with approach=mse, search=paths
-  => Approach=MSE | Search=paths | subset_size=1800 | Accuracy=68.80% (344/500)
+  => Approach=MSE | Search=paths | subset_size=1800 | Accuracy=75.80% (379/500) | FID=0.2345
 Cache cleared after finishing subset_size=1800. Current cache size: 0
-Saved scaling study plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110059/scaling_study_accuracy_mse_paths.png
+Saved scaling study accuracy plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_110604/scaling_study_accuracy_mse_paths.png
+Saved scaling study FID plot to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_110604/scaling_study_fid_mse_paths.png
 
-All experiments complete. Detailed logs saved to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250310_110059/combined_experiment_log.txt
+All experiments complete. Detailed logs saved to /home/ubuntu/diffusion_test_time_compute/hemal_experiments/experiment_outputs_20250311_110604/combined_experiment_log.txt
 Done!
 Note: For 'paths' search, distribution info was computed for timesteps=[799, 699, 599, 499, 399, 299, 199, 99, 0]
