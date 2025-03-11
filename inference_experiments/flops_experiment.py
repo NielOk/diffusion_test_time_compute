@@ -115,18 +115,9 @@ def singular_experiment():
     inference_checkpoints = get_checkpoints(num_steps=1000, delta_f=delta_f, delta_b=delta_b)
     target_distribution = estimate_target_distribution_mse(model, digit_loader, digit_to_generate, inference_checkpoints, device=device)
 
-    dist_key = (digit_to_generate, subset_size, scoring_approach, search_method)
-    _distribution_cache[dist_key] = target_distribution
-
-    # Search over paths
-    best_candidates= search_over_paths(n_candidates, delta_f, delta_b, model, model_ema, digit_to_generate, target_distribution, batch_size=2, model_type=model_type, ema=ema, use_clip=use_clip, device=device, scoring_approach=scoring_approach)
-
-    # Draw best candidate
-    for best_candidate in best_candidates:
-        best_image = (best_candidate.squeeze().detach().cpu().numpy() + 1.0) / 2.0
-        plt.imshow(best_image, cmap='gray')
-        plt.title("Best Generated Image")
-        plt.show()
+    # perform search
+    out_samples = generate_samples_for_digit(model, model_ema, digit_to_generate, subset_size, n_candidates, delta_f, delta_b, num_steps=1000, model_type=model_type, approach=scoring_approach, search_method=search_method, n_experiments=1, device=device, use_clip=use_clip, ema=ema)
+    print(out_samples)
 
 if __name__ == '__main__':
     singular_experiment()

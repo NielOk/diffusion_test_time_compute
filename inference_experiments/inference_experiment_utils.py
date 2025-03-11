@@ -760,3 +760,8 @@ def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda
     # Compute FID
     fid_val = compute_fid(real_feats, gen_feats)
     return fid_val
+
+# --------------
+# FLOP COUNTING
+# --------------
+

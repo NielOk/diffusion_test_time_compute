@@ -63,14 +63,14 @@ APPROACHES_TO_TRY = ["mse", "mixture"]  # distribution approaches
 SEARCH_METHODS_TO_TRY = ["top_k", "paths"]  # search methods
 
 # Number of repeated generation attempts per digit
-N_EXPERIMENTS_PER_DIGIT = 2 # 50
+N_EXPERIMENTS_PER_DIGIT = 50
 
 # Subset sizes for the distribution estimation
-VERIFIER_DATA_SIZES = [50]#[50, 100, 200, 600, 1000, 1400, 1800]
+VERIFIER_DATA_SIZES = [50, 100, 200, 600, 1000, 1400, 1800]
 
 # --- Separate numbers of candidates ---
-N_CANDIDATES_TOP_K = 2 # 128 # 512
-N_CANDIDATES_PATHS = 2 # 5
+N_CANDIDATES_TOP_K = 128 # 512
+N_CANDIDATES_PATHS = 5
 # --------------------------------------
 
 # If using the "paths" method, define partial forward/backward intervals:
