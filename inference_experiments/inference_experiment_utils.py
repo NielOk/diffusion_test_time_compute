@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from scipy.linalg import sqrtm  # For FID
 from collections import defaultdict
+import torch.profiler as profiler
 
 # Transformers / HF
 from transformers import AutoModelForImageClassification, AutoFeatureExtractor
@@ -765,3 +766,70 @@ def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda
 # FLOP COUNTING
 # --------------
 
+def get_operation_flop_dict(
+        model,
+        model_ema, 
+        digit_to_generate,
+        batch_size=16,
+        n_candidates=5,
+        model_type="lc",
+        approach="mse",
+        device="cuda",
+        ema=True,
+        use_clip=True
+):
+    
+    candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
+    B, K, C, H, W = candidates.shape
+    candidates = candidates.view(B * K, C, H, W)
+    
+    flops_dict = {}
+
+
+def flop_count_measurement(
+    model, 
+    model_ema,
+    digit_to_generate,
+    n_candidates=5,
+    delta_f=10,
+    delta_b=30,
+    num_steps=1000,
+    model_type="lc",
+    approach="mse",
+    search_method="top_k",
+    n_experiments=10,
+    device="cuda",
+    ema=True,
+    use_clip=True
+):
+    
+    # Flops is same across epochs so just use 100 epochs model 
+
+    TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage = load_code(model_type=model_type)
+    
+    # Load model architecture
+    model = load_model_architecture(MNISTDiffusion, device=device, model_type=model_type)
+    model_ema = ExponentialMovingAverage(model, decay=0.995, device=device)
+
+    # Get model filepaths
+    sorted_model_paths, sorted_epoch_numbers = get_model_paths(TRAINED_MODELS_DIR)
+
+    epoch_id = 100
+    model_to_load = sorted_model_paths[sorted_epoch_numbers.index(epoch_id)]
+
+    # Load model weights
+    checkpoint = torch.load(model_to_load, map_location=torch.device(device))
+    model.load_state_dict(checkpoint['model'])
+    model_ema.load_state_dict(checkpoint['model_ema'])
+
+    model.eval()
+    model_ema.eval()
+
+    if search_method == "top_k":
+        batch_size = min(n_experiments, 50)
+    if search_method == "paths":
+        batch_size = min(n_experiments, 10)
+
+    
+
+    checkpoints = get_checkpoints(delta_f, delta_b, num_steps=num_steps)
