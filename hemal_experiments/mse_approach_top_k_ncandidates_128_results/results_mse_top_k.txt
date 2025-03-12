@@ -1,0 +1,15 @@
+Approach=mse, Search=top_k
+(For top_k, used global CHECKPOINTS: [100, 200, 300, 400, 500, 700, 900])
+N_CANDIDATES_TOP_K: 128
+N_CANDIDATES_PATHS: 5
+DELTA_F=100, DELTA_B=200
+verifier_data_sizes: [50, 100, 200, 600, 1000, 1400, 1800]
+n_experiments_per_digit: 50
+Per-subset accuracy results:
+  subset_size=50, accuracy=0.7780, FID=0.1524
+  subset_size=100, accuracy=0.7840, FID=0.1573
+  subset_size=200, accuracy=0.8020, FID=0.1410
+  subset_size=600, accuracy=0.7560, FID=0.1466
+  subset_size=1000, accuracy=0.7940, FID=0.1473
+  subset_size=1400, accuracy=0.7960, FID=0.1556
+  subset_size=1800, accuracy=0.7900, FID=0.1577

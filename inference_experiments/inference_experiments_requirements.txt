@@ -5,4 +5,6 @@ torchvision
 transformers
 scikit-learn
 seaborn
+pillow
+scipy
 git+https://github.com/openai/CLIP.git
