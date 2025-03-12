@@ -403,10 +403,10 @@ def score_candidates(approach, dist_key, t, candidates):
         if t not in distribution_data:
             return None
         mus, var_t = distribution_data[t]  # mus: [N,1,28,28], var_t: float
-        c_expanded = candidates.view(B, K, C, H, W).unsqueeze(2)  # 🔹 (B, K, 1, C, H, W)
-        m_expanded = mus.unsqueeze(0).unsqueeze(0)  # 🔹 (1, 1, N, C, H, W)
+        c_expanded = candidates.view(B, K, C, H, W).unsqueeze(2)
+        m_expanded = mus.unsqueeze(0).unsqueeze(0)
         diff = c_expanded - m_expanded
-        sq_dist = diff.pow(2).mean(dim=[3,4,5])  # 🔹 (B, K, N)
+        sq_dist = diff.pow(2).mean(dim=[3,4,5])
         exponent = -sq_dist / (2.0 * var_t)
         max_exponent, _ = exponent.max(dim=2, keepdim=True)
         exponent_shifted = exponent - max_exponent
@@ -699,7 +699,7 @@ def generate_samples_for_digit(
 
     out_samples = []
     if search_method == "top_k":
-        batch_size = min(n_experiments, 50)  # Generate up to 16 images at a time
+        batch_size = min(n_experiments, 25)  # Generate up to 16 images at a time
     if search_method == "paths":
         batch_size = min(n_experiments, 10)  # Generate up to 8 images at a time
 
