@@ -699,7 +699,7 @@ def generate_samples_for_digit(
 
     out_samples = []
     if search_method == "top_k":
-        batch_size = min(n_experiments, 25)  # Generate up to 16 images at a time
+        batch_size = min(n_experiments, 10)  # Generate up to 16 images at a time
     if search_method == "paths":
         batch_size = min(n_experiments, 10)  # Generate up to 8 images at a time
 

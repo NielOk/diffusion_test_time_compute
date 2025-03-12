@@ -773,18 +773,69 @@ def get_operation_flop_dict(
         batch_size=16,
         n_candidates=5,
         model_type="lc",
-        approach="mse",
         device="cuda",
         ema=True,
-        use_clip=True
+        use_clip=True,
+        t = 500,
+        delta_f=10,
+        delta_b=30
 ):
     
     candidates = torch.randn((batch_size, n_candidates, model.in_channels, model.image_size, model.image_size), device=device)
     B, K, C, H, W = candidates.shape
     candidates = candidates.view(B * K, C, H, W)
+    noise = torch.randn_like(candidates)
+
+    # Since reverse diffusion and forward diffusion are both only one call, t, delta_f, and delta_b can be arbitrary.
+    t_tensor = torch.full((B * K,), t, device=device, dtype=torch.long)
+    t_back_tensor = torch.full((B * K,), t - delta_b, device=device, dtype=torch.long)
+    t_forward_tensor = torch.full((B * K,), t + delta_f, device=device, dtype=torch.long)
+
+    # Set up labels
+    if model_type == 'lc':
+        labels = torch.full((B * K,), digit_to_generate, device=device, dtype=torch.long)
+    else:
+        labels = None
+
+    # Set up model inputs
+    if model_type == 'lc':
+        reverse_diffusion_input = (candidates, t_tensor, noise, labels)
+    else:
+        reverse_diffusion_input = (candidates, t_tensor, noise)
+    forward_diffusion_input = (candidates, t_tensor, noise)
+    partial_forward_diffusion_input = (candidates, t_back_tensor, t_forward_tensor, noise)
     
     flops_dict = {}
 
+    # Partial forward diffusion flop count
+    with profiler.profile(with_flops=True) as prof:
+        model._partial_forward_diffusion(*partial_forward_diffusion_input)
+    partial_forward_flops = sum(event.flops for event in prof.key_averages())
+
+    flops_dict['partial_forward_diffusion'] = partial_forward_flops
+
+    if ema:
+        if use_clip:
+            with profiler.profile(with_flops=True) as prof:
+                model_ema.module._reverse_diffusion_with_clip(*reverse_diffusion_input)
+            reverse_diffusion_flops = sum(event.flops for event in prof.key_averages())
+        else:
+            with profiler.profile(with_flops=True) as prof:
+                model_ema.module._reverse_diffusion(*reverse_diffusion_input)
+            reverse_diffusion_flops = sum(event.flops for event in prof.key_averages())
+    else:
+        if use_clip:
+            with profiler.profile(with_flops=True) as prof:
+                model._reverse_diffusion_with_clip(*reverse_diffusion_input)
+            reverse_diffusion_flops = sum(event.flops for event in prof.key_averages())
+        else:
+            with profiler.profile(with_flops=True) as prof:
+                model._reverse_diffusion(*reverse_diffusion_input)
+            reverse_diffusion_flops = sum(event.flops for event in prof.key_averages())
+    
+    flops_dict['reverse_diffusion'] = reverse_diffusion_flops
+
+    return flops_dict
 
 def flop_count_measurement(
     model, 
@@ -830,6 +881,7 @@ def flop_count_measurement(
     if search_method == "paths":
         batch_size = min(n_experiments, 10)
 
+    flops_dict = get_operation_flop_dict(model, model_ema, digit_to_generate, batch_size, n_candidates, model_type, device, ema, use_clip, delta_f=delta_f, delta_b=delta_b)
     
 
     checkpoints = get_checkpoints(delta_f, delta_b, num_steps=num_steps)
