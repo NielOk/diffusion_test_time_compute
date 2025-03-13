@@ -2,7 +2,6 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
 import itertools
 
 # === Import the required helpers from your snippet ===
@@ -16,9 +15,14 @@ from inference_experiment_utils import (
     HF_MODEL_NAME,
 )
 
-def plot_class_distribution(labels, title):
+def plot_class_distribution(labels, possible_labels, title):
+    counts, _ = np.histogram(labels, bins=np.arange(11))  # Bin edges from 0 to 10
+    
     plt.figure()
-    plt.hist(labels, bins=10)
+    plt.bar(possible_labels, counts, width=0.8, align='center', edgecolor='black')
+    plt.xticks(possible_labels)  # Ensure all class labels (0-9) are displayed
+    plt.xlabel("Class Label")
+    plt.ylabel("Frequency")
     plt.title(title)
     plt.savefig(f"{title}.png")
 
@@ -56,18 +60,21 @@ def nlc_experiment_multiple_images(target_epoch=100, num_samples=450, batch_size
     model_ema.eval()
 
     hf_model, feature_extractor = load_hf_classifier(HF_MODEL_NAME, device=device)
+
+    print("Models loaded successfully")
     
     # We'll track predictions (from HF) vs. the ground-truth digit
     all_preds = []
 
     for batch_id in range(num_samples // batch_size):
         print(f"Batch {batch_id}")
-        noise = torch.randn((batch_size, model.in_channels, model.image_size, model.image_size), device=device)
-        candidates = torch.randn((batch_size, model.in_channels, model.image_size, model.image_size), device=device)
+        candidates = torch.randn((batch_size, 1, model.in_channels, model.image_size, model.image_size), device=device)
+        candidates = candidates.view(batch_size, model.in_channels, model.image_size, model.image_size)
+        noise = torch.randn_like(candidates)
 
         if use_ema:
             if use_clip:
-                images = denoise_to_step(model_ema, candidates, t=0, start_point=model.timesteps - 1, labels=None, model_type=model_type, device=device, ema=use_ema, use_clip=use_clip)
+                images = denoise_to_step(model_ema, candidates, t=0, start_point=model.timesteps - 1, labels=None, B=batch_size, K=1,model_type=model_type, device=device, ema=use_ema, use_clip=use_clip)
             else:
                 raise NotImplementedError("Not implemented for non-clipped")
         else:
@@ -77,7 +84,8 @@ def nlc_experiment_multiple_images(target_epoch=100, num_samples=450, batch_size
         all_preds.extend(predicted_labels.tolist())
 
     all_preds = np.array(all_preds)
-    plot_class_distribution(all_preds, title="Baseline Predicted Class Distribution")
+    possible_labels = [i for i in range(10)]
+    plot_class_distribution(all_preds, title="Baseline Predicted Class Distribution", possible_labels=possible_labels)
 
 if __name__ == "__main__":
 
