@@ -653,15 +653,15 @@ def generate_samples_for_digit(
 
 def save_sample_images(samples, digit, approach, search_method, subset_size, n_experiments, device="cuda"):
 
-    if not os.path.exists(os.path.join(LOG_DIR, f"{digit} samples")):
-        os.makedirs(os.path.join(LOG_DIR, f"{digit} samples"))
+    if not os.path.exists(os.path.join(LOG_DIR, f"verifier_size_{subset_size}_digit_{digit}_samples")):
+        os.makedirs(os.path.join(LOG_DIR, f"verifier_size_{subset_size}_digit_{digit}_samples"))
 
     for i, (img, label) in enumerate(samples):
         img = img.squeeze().detach().cpu().numpy()
         img = (img + 1.0) / 2.0 * 255.0
         img = np.clip(img, 0, 255).astype(np.uint8)
         img_pil = Image.fromarray(img, mode='L').convert('RGB')
-        img_pil.save(os.path.join(LOG_DIR, f"{digit} samples", f"{digit}_{approach}_{search_method}_subset_{subset_size}_exp_{i}.png"))
+        img_pil.save(os.path.join(LOG_DIR,f"verifier_size_{subset_size}_digit_{digit}_samples", f"{digit}_{approach}_{search_method}_subset_{subset_size}_exp_{i}.png"))
 
 
 # ============================
