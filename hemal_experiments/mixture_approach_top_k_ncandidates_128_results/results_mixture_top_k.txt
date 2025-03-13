@@ -6,10 +6,10 @@ DELTA_F=100, DELTA_B=200
 verifier_data_sizes: [50, 100, 200, 600, 1000, 1400, 1800]
 n_experiments_per_digit: 50
 Per-subset accuracy results:
-  subset_size=50, accuracy=0.7960, FID=0.1854
-  subset_size=100, accuracy=0.8500, FID=0.1848
-  subset_size=200, accuracy=0.7980, FID=0.1858
-  subset_size=600, accuracy=0.8100, FID=0.1893
-  subset_size=1000, accuracy=0.8000, FID=0.1901
-  subset_size=1400, accuracy=0.7980, FID=0.1828
-  subset_size=1800, accuracy=0.7880, FID=0.1984
+  subset_size=50, accuracy=0.7780
+  subset_size=100, accuracy=0.7900
+  subset_size=200, accuracy=0.8480
+  subset_size=600, accuracy=0.7980
+  subset_size=1000, accuracy=0.8120
+  subset_size=1400, accuracy=0.8140
+  subset_size=1800, accuracy=0.8400

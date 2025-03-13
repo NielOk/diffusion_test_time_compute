@@ -1,5 +1,5 @@
 === EXPERIMENT DETAILS ===
-Timestamp: 20250312_040050
+Timestamp: 20250313_112529
 MODEL_TYPE: nlc
 USE_EMA: True
 Checkpoints (used only for top_k): [100, 200, 300, 400, 500, 700, 900]
