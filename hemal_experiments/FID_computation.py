@@ -8,7 +8,7 @@ import torchvision.transforms as T
 import scipy.linalg
 
 CLASSIFIER_CHECKPOINT = 'classifier_160epochs.pt'
-IMAGE_FOLDER = "/generated_images"
+IMAGE_FOLDER = "./noise_sample_images"
 
 
 # 1) DEVICE
@@ -182,7 +182,10 @@ if __name__ == "__main__":
                                         batch_size=256, num_workers=4)
     print("gen_feats shape:", gen_feats.shape)
     
-    n = min(val_feats.shape[0], gen_feats.shape[0])
+    n_val = val_feats.shape[0]
+    n_gen = gen_feats.shape[0]
+    
+    n = min(n_val, n_gen)
     if n_gen != n_val:
         print(f"Using {n} images from each set (generated: {n_gen}, validation: {n_val}).")
 
@@ -192,5 +195,5 @@ if __name__ == "__main__":
     gen_feats_sampled = gen_feats[indices_gen]
 
     # Compute FID
-    fid = frechet_distance(gen_feats, val_feats)
+    fid = frechet_distance(val_feats_sampled, gen_feats_sampled)
     print(f"FID (generated vs val) = {fid:.4f}")
