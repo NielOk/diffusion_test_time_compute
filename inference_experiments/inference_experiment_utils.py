@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-from scipy.linalg import sqrtm  # For FID
 from collections import defaultdict
 import torch.profiler as profiler
 
@@ -66,81 +65,6 @@ def load_code(model_type='lc'):
 
         return NLC_TRAINED_MODELS_DIR, create_mnist_dataloaders, MNISTDiffusion, ExponentialMovingAverage
     
-# -----------------------------------------------------------------------------
-# 1) FID SUPPORT: MNIST Inception + feature extraction + FID calculation
-# -----------------------------------------------------------------------------
-
-class MnistInceptionModel(torch.nn.Module):
-    """
-    Minimal "Inception-like" model for MNIST, purely for demonstration.
-    Outputs a 128-D penultimate layer for FID calculation.
-    """
-    def __init__(self):
-        super().__init__()
-        self.features_layer = torch.nn.Sequential(
-            torch.nn.Linear(28*28, 128),  # expects 1×28×28 => 784
-            torch.nn.ReLU(),
-        )
-        self.classifier = torch.nn.Linear(128, 10)  # 10 classes for MNIST
-
-    def forward(self, x):
-        """
-        x shape: [batch, 1, 28, 28].
-        We'll flatten, feed to features, then classify.
-        """
-        b, c, h, w = x.shape
-        x = x.view(b, -1)          # shape [b, 784]
-        feats = self.features_layer(x)  # shape [b, 128]
-        logits = self.classifier(feats) # shape [b, 10]
-        return logits, feats
-
-    def features(self, x):
-        """
-        Returns the penultimate-layer (128-D) embeddings.
-        """
-        _, feats = self.forward(x)
-        return feats
-
-def get_mnist_features(images, fid_model, device):
-    """
-    images : list of PIL Images
-    returns: np.array shape [N,128] of penultimate-layer features
-    """
-    transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((28, 28)),
-        transforms.ToTensor(),
-    ])
-    feats_list = []
-    for img in images:
-        img_t = transform(img).unsqueeze(0).to(device)  # shape [1,1,28,28]
-        with torch.no_grad():
-            feats = fid_model.features(img_t)  # shape [1,128]
-        feats_list.append(feats.squeeze(0).cpu().numpy())
-    return np.vstack(feats_list)
-
-def compute_fid(x_feats, y_feats):
-    """
-    Frechet Inception Distance (FID) between two sets of features.
-    x_feats: [N,128]
-    y_feats: [M,128]
-    """
-    mu_x = np.mean(x_feats, axis=0)
-    mu_y = np.mean(y_feats, axis=0)
-    sigma_x = np.cov(x_feats, rowvar=False)
-    sigma_y = np.cov(y_feats, rowvar=False)
-
-    diff = mu_x - mu_y
-    diff_sq = diff.dot(diff)
-
-    cov_prod = sigma_x.dot(sigma_y)
-    cov_sqrt, _ = sqrtm(cov_prod, disp=False)
-    if np.iscomplexobj(cov_sqrt):
-        cov_sqrt = cov_sqrt.real
-
-    fid_val = diff_sq + np.trace(sigma_x + sigma_y - 2 * cov_sqrt)
-    return fid_val
-
 #============
 # 2) Helpers
 #============
@@ -704,63 +628,6 @@ def generate_samples_for_digit(
             out_samples.append((img.unsqueeze(0), digit_to_generate))
 
     return out_samples
-
-# -----------------------------------------------------------------------------
-# 2) FID HELPER: Gather real test-set images + compute FID vs. generated
-# -----------------------------------------------------------------------------
-
-def get_test_pil_images_for_digit(digit, num_images_needed):
-    """
-    Gather `num_images_needed` PIL images of the given digit from *test* set (not train).
-    """
-    mnist_test = datasets.MNIST(
-        root=MNIST_ROOT,
-        train=False,
-        download=True,
-        transform=None
-    )
-    images = []
-    for img, label in mnist_test:
-        if label == digit:
-            images.append(img)  # raw PIL
-            if len(images) == num_images_needed:
-                break
-    return images
-
-def compute_fid_for_generated_samples(generated_samples, fid_model, device="cuda"):
-    """
-    Given a list of (torch_image, digit) pairs in `generated_samples`,
-    gather an equal number of real test-set images per digit, extract features,
-    and compute the FID (one big real-vs-generated set).
-    """
-    gen_by_digit = defaultdict(list)
-
-    # Convert each generated sample to a PIL image and group by digit
-    for (torch_img, d) in generated_samples:
-        arr = torch_img.squeeze(0).detach().cpu().numpy().squeeze()
-        arr_255 = (arr + 1.0) / 2.0 * 255.0
-        arr_255 = np.clip(arr_255, 0, 255).astype(np.uint8)
-        pil_img = Image.fromarray(arr_255, mode='L')
-        gen_by_digit[d].append(pil_img)
-
-    all_generated_pil = []
-    all_real_pil = []
-
-    # For each digit, gather same count of real test images
-    for d in range(10):
-        gen_list = gen_by_digit[d]
-        num_gen = len(gen_list)
-        real_list = get_test_pil_images_for_digit(d, num_gen)
-        all_generated_pil.extend(gen_list)
-        all_real_pil.extend(real_list)
-
-    # Extract features
-    real_feats = get_mnist_features(all_real_pil, fid_model, device)
-    gen_feats  = get_mnist_features(all_generated_pil, fid_model, device)
-
-    # Compute FID
-    fid_val = compute_fid(real_feats, gen_feats)
-    return fid_val
 
 # --------------
 # FLOP COUNTING
