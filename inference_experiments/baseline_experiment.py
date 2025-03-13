@@ -89,4 +89,4 @@ def nlc_experiment_multiple_images(target_epoch=100, num_samples=450, batch_size
 
 if __name__ == "__main__":
 
-    nlc_experiment_multiple_images(target_epoch=100, num_samples=450, batch_size=50)
+    nlc_experiment_multiple_images(target_epoch=100, num_samples=500, batch_size=50)
