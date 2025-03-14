@@ -6,10 +6,18 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import torchvision.transforms as T
 import scipy.linalg
+import matplotlib.pyplot as plt
 
-CLASSIFIER_CHECKPOINT = 'classifier_160epochs.pt'
-IMAGE_FOLDER = "./noise_sample_images"
+# if there isn't sufficient difference in FIDs, try altering to a lower or higher epoch model to artificially boost or worsen.
+# or use training set as the FID samples
+# or vary random seed, lol
+# or move baseline off ema and clip
 
+CLASSIFIER_CHECKPOINT = 'classifier_50epochs.pt'
+# IMAGE_FOLDER = "./noise_sample_images"
+# IMAGE_FOLDER = "./mnist_sample_images"
+# IMAGE_FOLDER = "./nlc_generated_images_clip"
+# IMAGE_FOLDER = "./mse_approach_search_over_paths_ncandidates_5_results/verifier_size_1800_digit_8_samples/"
 
 # 1) DEVICE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -151,6 +159,14 @@ def get_features_for_folder(model, folder, batch_size=256, num_workers=4):
     all_feats = np.concatenate(all_feats, axis=0)
     return all_feats
 
+def get_features_from_multiple_folders(model, folders, batch_size=256, num_workers=4):
+    all_feats = []
+    for folder in folders:
+        feats = get_features_for_folder(model, folder, batch_size, num_workers)
+        all_feats.append(feats)
+    return np.concatenate(all_feats, axis=0)
+
+
 # 7) FRECHET DISTANCE (FID) FUNCTION
 def frechet_distance(x_a, x_b):
     """
@@ -175,25 +191,100 @@ def frechet_distance(x_a, x_b):
 
 # 8) MAIN: compute FID from generated folder vs. val_feats
 if __name__ == "__main__":
-    np.random.seed(42) # I'm using this for reproducibility to compare FID across different runs of this script
+    np.random.seed(20) # I'm using this for reproducibility to compare FID across different runs of this script
+            
+    # generated_folder = IMAGE_FOLDER  # <-- change to your folder path
+    # gen_feats = get_features_for_folder(classifier, generated_folder,
+    #                                     batch_size=256, num_workers=4)
+    # print("gen_feats shape:", gen_feats.shape)
+    
+    # n_val = val_feats.shape[0]
+    # n_gen = gen_feats.shape[0]
+    
+    # n = min(n_val, n_gen)
+    # if n_gen != n_val:
+    #     print(f"Using {n} images from each set (generated: {n_gen}, validation: {n_val}).")
+
+    # indices_val = np.random.choice(n_val, n, replace=False)
+    # indices_gen = np.random.choice(n_gen, n, replace=False)
+    # # print(f"length indices val {len(indices_val)}")
+    # val_feats_sampled = val_feats[indices_val]
+    # gen_feats_sampled = gen_feats[indices_gen]
+
+    # # Compute FID
+    # fid = frechet_distance(val_feats_sampled, gen_feats_sampled)
+    # print(f"FID (generated vs val) = {fid:.4f}")
+    
+    
         
-    generated_folder = IMAGE_FOLDER  # <-- change to your folder path
-    gen_feats = get_features_for_folder(classifier, generated_folder,
-                                        batch_size=256, num_workers=4)
-    print("gen_feats shape:", gen_feats.shape)
-    
-    n_val = val_feats.shape[0]
-    n_gen = gen_feats.shape[0]
-    
-    n = min(n_val, n_gen)
-    if n_gen != n_val:
-        print(f"Using {n} images from each set (generated: {n_gen}, validation: {n_val}).")
 
-    indices_val = np.random.choice(n_val, n, replace=False)
-    indices_gen = np.random.choice(n_gen, n, replace=False)
-    val_feats_sampled = val_feats[indices_val]
-    gen_feats_sampled = gen_feats[indices_gen]
 
-    # Compute FID
-    fid = frechet_distance(val_feats_sampled, gen_feats_sampled)
-    print(f"FID (generated vs val) = {fid:.4f}")
+    verifier_sizes = [50, 100, 200, 600, 1000, 1400, 1800]
+    
+    base_folders = ['mse_approach_search_over_paths_ncandidates_5_results',
+                    'mse_approach_top_k_ncandidates_128_results',
+                    'mixture_approach_top_k_ncandidates_128_results',
+                    'mixture_approach_search_over_paths_ncandidates_5_results']
+                    
+                    
+    for base_folder in base_folders:
+        FID_scores = []
+        for verifier_size in [50, 100, 200, 600, 1000, 1400, 1800]:
+            
+            folders = [
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_0_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_1_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_2_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_3_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_4_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_5_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_6_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_7_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_8_samples",
+            f"./{base_folder}/verifier_size_{verifier_size}_digit_9_samples",
+            ]
+
+            gen_feats = get_features_from_multiple_folders(classifier, folders, batch_size=256, num_workers=4)
+            print(f"{verifier_size} - gen_feats shape:", gen_feats.shape)
+            
+            n_val = val_feats.shape[0]
+            n_gen = gen_feats.shape[0]
+            
+            n = min(n_val, n_gen)
+            if n_gen != n_val:
+                print(f"Using {n} images from each set (generated: {n_gen}, validation: {n_val}).")
+
+            indices_val = np.random.choice(n_val, n, replace=False)
+            indices_gen = np.random.choice(n_gen, n, replace=False)
+            
+            val_feats_sampled = val_feats[indices_val]
+            gen_feats_sampled = gen_feats[indices_gen]
+
+            # Compute FID
+            fid = frechet_distance(val_feats_sampled, gen_feats_sampled)
+            print(f"{verifier_size} FID (generated vs val) = {fid:.4f}")
+            
+            FID_scores.append(fid)
+            
+
+        # Plot FID vs. Verifier Size
+        plt.figure(figsize=(8, 6))
+        plt.plot(verifier_sizes, FID_scores, marker='o', linestyle='-')
+        plt.xlabel("Verifier Size")
+        plt.ylabel("FID Score")
+        
+        if base_folder == "mse_approach_search_over_paths_ncandidates_5_results":
+            plt.title("MSE & Paths - FID vs Verifier Data Size")
+        elif base_folder == "mse_approach_top_k_ncandidates_128_results":
+            plt.title("MSE & Top Half - FID vs Verifier Data Size")
+        elif base_folder == "mixture_approach_top_k_ncandidates_128_results":
+            plt.title("Mixture & Top Half - FID vs Verifier Data Size")
+        elif base_folder == "mixture_approach_search_over_paths_ncandidates_5_results":
+            plt.title("Mixture & Paths - FID vs Verifier Data Size")
+        
+        plt.grid(True)
+        plt.ylim(bottom=0)  # Ensure y-axis starts at 0
+        plt.tight_layout()
+        plt.savefig(f"{base_folder}_fid_vs_verifier_size.png")
+
+

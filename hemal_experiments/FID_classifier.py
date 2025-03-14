@@ -79,7 +79,7 @@ class Classifier(torch.nn.Module):
 # -------------------------------------------------------------------
 batch_size    = 128
 learning_rate = 1e-3
-num_epochs    = 160  # Typically you'd do more (e.g., 20+), but adjust as needed.
+num_epochs    = 20  # Typically you'd do more (e.g., 20+), but adjust as needed.
 
 classifier = Classifier().to(device)
 optimizer  = torch.optim.Adam(classifier.parameters(), learning_rate)
@@ -126,7 +126,7 @@ for epoch in range(num_epochs):
 # -------------------------------------------------------------------
 #  SAVE THE CLASSIFIER CHECKPOINT
 # -------------------------------------------------------------------
-torch.save(classifier.state_dict(), 'classifier.pt')
+torch.save(classifier.state_dict(), f"classifier_{num_epochs}epochs.pt")
 print("Classifier checkpoint saved to classifier.pt")
 
 
