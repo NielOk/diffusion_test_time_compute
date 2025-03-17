@@ -1,2 +1,2 @@
 # diffusion_test_time_compute
-Scaling inference compute for DDPMs
+tldr: we adapted DeepMind's inference-scaling framework for deterministic ODE-solver based diffusion models to work with DDPMs (stochastic), then came up with our own verifier, which uses small subsets of labeled training examples. Ultimately, we were able to use small subsets of labeled training examples to test-time condition a model that was originally trained to be unconditioned.
