@@ -1,2 +1,0 @@
-Total Generated Samples: 20
-Classification Accuracy: 40.00%  (8/20)
