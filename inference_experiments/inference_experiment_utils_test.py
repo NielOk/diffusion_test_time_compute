@@ -109,14 +109,14 @@ def singular_experiment():
 
     subset_size = 1000
 
-    digit_loader = create_digit_dataloader(digit=digit_to_generate, subset_size=subset_size, batch_size=128)
+    digit_loader, indices = create_digit_dataloader(digit=digit_to_generate, subset_size=subset_size, batch_size=128)
 
     # Get mse target distribution
     inference_checkpoints = get_checkpoints(num_steps=1000, delta_f=delta_f, delta_b=delta_b)
     target_distribution = estimate_target_distribution_mse(model, digit_loader, digit_to_generate, inference_checkpoints, device=device)
 
     # perform search
-    out_samples = generate_samples_for_digit(model, model_ema, digit_to_generate, subset_size, n_candidates, delta_f, delta_b, num_steps=1000, model_type=model_type, approach=scoring_approach, search_method=search_method, n_experiments=1, device=device, use_clip=use_clip, ema=ema)
+    out_samples, indices = generate_samples_for_digit(model, model_ema, digit_to_generate, subset_size, n_candidates, delta_f, delta_b, num_steps=1000, model_type=model_type, approach=scoring_approach, search_method=search_method, n_experiments=1, device=device, use_clip=use_clip, ema=ema)
     print(out_samples)
 
 if __name__ == '__main__':

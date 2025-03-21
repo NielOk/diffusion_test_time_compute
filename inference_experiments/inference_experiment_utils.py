@@ -95,7 +95,7 @@ def create_digit_dataloader(digit, subset_size=None, batch_size=128, image_size=
         plt.title(f"Sample Digit: {sample_label}")
         plt.show()
 
-    return DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    return DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=num_workers), indices
 
 def get_model_paths(TRAINED_MODELS_DIR):
     # Get model filepaths
@@ -589,7 +589,7 @@ def generate_samples_for_digit(
     
     checkpoints = get_checkpoints(delta_f, delta_b, num_steps=num_steps)
     
-    digit_loader = create_digit_dataloader(digit=digit_to_generate, subset_size=verifier_data_subset_size, batch_size=128)
+    digit_loader, verifier_data_indices = create_digit_dataloader(digit=digit_to_generate, subset_size=verifier_data_subset_size, batch_size=128)
     distribution_data = get_distribution_for_digit(model, digit_loader, digit_to_generate, checkpoints, device, approach)
 
     out_samples = []
@@ -627,7 +627,7 @@ def generate_samples_for_digit(
         for img in batch_noise:
             out_samples.append((img.unsqueeze(0), digit_to_generate))
 
-    return out_samples
+    return out_samples, verifier_data_indices
 
 def save_sample_images(samples, digit, approach, search_method, subset_size, n_experiments, log_dir, device="cuda"):
 
