@@ -764,3 +764,14 @@ def flop_count_measurement(
     
 
     checkpoints = get_checkpoints(delta_f, delta_b, num_steps=num_steps)
+
+
+#####################
+# Repeatbility Utils 
+#####################
+def load_data_from_indices(indices, root=MNIST_ROOT, train=True, download=True):
+    
+    full_dataset = datasets.MNIST(root=root, train=train, download=download)
+    images, labels = zip(*[full_dataset[i] for i in indices])
+
+    return images, labels
