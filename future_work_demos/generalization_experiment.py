@@ -107,46 +107,40 @@ def main():
     model.eval()
     model_ema.eval()
 
-    # Get the normalized generated samples and verifier samples
-    digit_samples, verifier_samples = normalized_generate_images_and_get_verifier_images(
-        model=model,
-        model_ema=model_ema,
-        digit_to_generate=8,
-        n_samples=n_samples,
-        verifier_data_size=subset_size,
-        n_candidates=n_candidates_paths,
-        delta_f=delta_f,
-        delta_b=delta_b,
-        approach=scoring_approach,
-        search_method=search_method,
-        model_type=model_type,
-        device=device,
-        ema=ema,
-        use_clip=use_clip
-    )
-
     # Create the generalization experiment results directory first
     generalization_experiment_results_dir = os.path.join(FUTURE_WORK_DEMOS_DIR, "generalization_experiment_results")
     os.makedirs(generalization_experiment_results_dir, exist_ok=True)
 
-    # Save the generated samples
-    save_dir = os.path.join(generalization_experiment_results_dir, "generated_samples")
-    os.makedirs(save_dir, exist_ok=True)
-    for i, (img, label) in enumerate(digit_samples):
-        img = img.squeeze().detach().cpu().numpy()
-        img = (img + 1.0) / 2.0 * 255.0
-        img = np.clip(img, 0, 255).astype(np.uint8)
-        img_pil = Image.fromarray(img, mode='L').convert('RGB')
-        img_pil.save(os.path.join(save_dir, f"generated_sample_{i}.png"))
+    # Loop through digits
+    for digit in digit_array:
 
-    # Save 2 verifier samples
-    save_dir = os.path.join(generalization_experiment_results_dir, "verifier_samples")
-    os.makedirs(save_dir, exist_ok=True)
-    for i, sample in enumerate(verifier_samples):
-        if i >= 2:
-            break
-        img = Image.fromarray((sample[0].cpu().numpy() * 255).astype(np.uint8), mode='L')
-        img.save(os.path.join(save_dir, f"verifier_sample_{i}.png"))
+        # Get the normalized generated samples and verifier samples
+        digit_samples, verifier_samples = normalized_generate_images_and_get_verifier_images(
+            model=model,
+            model_ema=model_ema,
+            digit_to_generate=digit,
+            n_samples=n_samples,
+            verifier_data_size=subset_size,
+            n_candidates=n_candidates_paths,
+            delta_f=delta_f,
+            delta_b=delta_b,
+            approach=scoring_approach,
+            search_method=search_method,
+            model_type=model_type,
+            device=device,
+            ema=ema,
+            use_clip=use_clip
+        )
+
+        # Save the generated samples
+        save_dir = os.path.join(generalization_experiment_results_dir, f"digit_{digit}_generated_samples")
+        os.makedirs(save_dir, exist_ok=True)
+        for i, (img, label) in enumerate(digit_samples):
+            img = img.squeeze().detach().cpu().numpy()
+            img = (img + 1.0) / 2.0 * 255.0
+            img = np.clip(img, 0, 255).astype(np.uint8)
+            img_pil = Image.fromarray(img, mode='L').convert('RGB')
+            img_pil.save(os.path.join(save_dir, f"generated_sample_{i}.png"))
 
 if __name__ == '__main__':
     main()
