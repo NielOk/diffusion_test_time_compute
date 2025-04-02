@@ -20,66 +20,57 @@ data_test  = MNIST('.', download=True, train=False)
 
 # Convert from [0..255] to [-1..1].
 # Shape after this is (N, 28, 28)
-x_train = 2.0 * (data_train.data / 255.0 - 0.5)
-x_val   = 2.0 * (data_test.data  / 255.0 - 0.5)
+x_train = data_train.data.float() / 255.0 * 2.0 - 1.0
+x_val   = data_test.data.float()  / 255.0 * 2.0 - 1.0
 y_train = data_train.targets
 y_val   = data_test.targets
 
-# Optionally, pad from 28×28 to 32×32 (value = -1) to match the reference model dimensions.
-# This is the only extra step needed to handle 28×28 inside the reference classifier.
-x_train = F.pad(x_train, (2,2,2,2), value=-1)  # shape: (N, 32, 32)
-x_val   = F.pad(x_val,   (2,2,2,2), value=-1)  # shape: (N, 32, 32)
-
-# For training, the classifier expects shape (N,1,32,32), so add a channels dimension.
-x_train = x_train.unsqueeze(1)  # shape: (N, 1, 32, 32)
-x_val   = x_val.unsqueeze(1)    # shape: (N, 1, 32, 32)
+x_train = x_train.unsqueeze(1)  # shape: (N, 1, 28, 28)
+x_val   = x_val.unsqueeze(1)    # shape: (N, 1, 28, 28)
 
 # -------------------------------------------------------------------
 #  CLASSIFIER DEFINITION
 # -------------------------------------------------------------------
 class Classifier(torch.nn.Module):
-    """
-    Simple CNN classifier for 32×32 grayscale inputs (MNIST is padded to 32×32).
-    The final classification layer is 'classification_layer',
-    while 'layers' ends with a dropout output you can treat as a penultimate feature.
-    """
     def __init__(self):
         super(Classifier, self).__init__()
-        self.layers = torch.nn.Sequential(
-            # 1×32×32
-            torch.nn.Conv2d(1, 8, 3, padding='same'),
+        self.features = torch.nn.Sequential(
+            # First block
+            torch.nn.Conv2d(1, 32, 3, padding=1),    # (N, 32, 28, 28)
+            torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
-            torch.nn.MaxPool2d(2, 2),  # 8×16×16
+            torch.nn.MaxPool2d(2, 2),                # (N, 32, 14, 14)
 
-            torch.nn.Conv2d(8, 16, 3, padding='same'),
+            # Second block
+            torch.nn.Conv2d(32, 64, 3, padding=1),   # (N, 64, 14, 14)
+            torch.nn.BatchNorm2d(64),
             torch.nn.ReLU(),
-            torch.nn.MaxPool2d(2, 2), # 16×8×8
+            torch.nn.MaxPool2d(2, 2),                # (N, 64, 7, 7)
 
-            torch.nn.Conv2d(16, 32, 3, padding='same'),
+            # Third block
+            torch.nn.Conv2d(64, 128, 3, padding=1),  # (N, 128, 7, 7)
+            torch.nn.BatchNorm2d(128),
             torch.nn.ReLU(),
-            torch.nn.AvgPool2d(4, 4), # 32×2×2 => 32×1×1 after avgpool => shape is (N,32)
-
-            torch.nn.Flatten(),       # => shape (N,32)
-            torch.nn.Dropout(),       # => shape (N,32)
-            # The last layer in `layers` is just the penultimate feature representation.
+            torch.nn.AdaptiveAvgPool2d((1, 1)),      # (N, 128, 1, 1)
+            torch.nn.Flatten(),                      # (N, 128)
         )
-        # We map that 32-dim feature to 10 classes (digits 0..9).
-        self.classification_layer = torch.nn.Linear(128, 10)
-        
+
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Dropout(p=0.5),
+            torch.nn.Linear(128, 10)
+        )
 
     def forward(self, x):
-        # x assumed shape: (N, 1, 32, 32)
-        feat = self.layers(x)                        # (N,32)
-        out  = self.classification_layer(feat)       # (N,10)
-        return out
+        x = self.features(x)
+        return self.classifier(x)
 
 
 # -------------------------------------------------------------------
 #  TRAINING THE CLASSIFIER
 # -------------------------------------------------------------------
-batch_size    = 128
+batch_size    = 32 # Make sure this matches the batch size used in the classifier
 learning_rate = 1e-3
-num_epochs    = 20  # Typically you'd do more (e.g., 20+), but adjust as needed.
+num_epochs    = 20 # Typically you'd do more (e.g., 20+), but adjust as needed.
 
 classifier = Classifier().to(device)
 optimizer  = torch.optim.Adam(classifier.parameters(), learning_rate)
@@ -93,15 +84,11 @@ val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 for epoch in range(num_epochs):
     classifier.train()
     running_loss = 0.0
-    for x_batch, y_batch in train_loader:
-        x_batch = x_batch.to(device)  # shape: (B,1,32,32)
-        y_batch = y_batch.to(device)
 
-        # Forward
+    for x_batch, y_batch in train_loader:
         logits = classifier(x_batch)
         loss   = cross_entropy(logits, y_batch)
 
-        # Backprop
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -111,17 +98,24 @@ for epoch in range(num_epochs):
     # Validation
     classifier.eval()
     val_loss = 0.0
+    correct = 0
+    total = 0
     with torch.no_grad():
         for x_batch_val, y_batch_val in val_loader:
-            x_batch_val = x_batch_val.to(device)
-            y_batch_val = y_batch_val.to(device)
-            logits_val  = classifier(x_batch_val)
-            loss_val    = cross_entropy(logits_val, y_batch_val)
-            val_loss   += loss_val.item()
+            logits_val = classifier(x_batch_val)
+            loss_val = cross_entropy(logits_val, y_batch_val)
+            val_loss += loss_val.item()
+
+            preds = torch.argmax(logits_val, dim=1)
+            correct += (preds == y_batch_val).sum().item()
+            total   += y_batch_val.size(0)
 
     running_loss /= len(train_loader)
     val_loss     /= len(val_loader)
-    print(f"[Epoch {epoch+1}/{num_epochs}] loss={running_loss:.4f}, val_loss={val_loss:.4f}")
+    val_acc      = 100.0 * correct / total
+
+    print(f"[Epoch {epoch+1:02}/{num_epochs}] "
+          f"loss={running_loss:.4f}, val_loss={val_loss:.4f}, val_acc={val_acc:.2f}%")
 
 # -------------------------------------------------------------------
 #  SAVE THE CLASSIFIER CHECKPOINT
