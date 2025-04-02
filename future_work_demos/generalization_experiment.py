@@ -152,7 +152,7 @@ def compute_fid_score(fid_model_location, generated_results_dir, verifier_indice
     # Get the features for the verifier samples
     verifier_features = get_features_for_verifier_indices(model, verifier_indices, device=device)
 
-    
+
 
 
 def main():
@@ -203,9 +203,8 @@ def main():
 
     ### Save generated samples and verifier indices ###
     verifier_indices_dict_path = os.path.join(generalization_experiment_results_dir, "verifier_indices.json")
-    '''
+    
     verifier_indices_dict = {}
-
     # Loop through digits
     for digit in digit_array:
 
@@ -244,7 +243,6 @@ def main():
 
     with open(verifier_indices_dict_path, 'w') as f:
         json.dump(verifier_indices_dict, f)
-    '''
 
     ### Compute FID Score ###
     # Get FID model location
