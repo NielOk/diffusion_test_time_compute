@@ -83,6 +83,29 @@ class FlatImageFolderDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         return img
+    
+def get_non_verifier_indices_dict(verifier_indices_dict):
+    """
+    Get non-verifier indices from the verifier indices.
+    """
+
+    all_verifier_indices = []
+    for digit, verifier_indices in verifier_indices_dict.items():
+        all_verifier_indices.extend(verifier_indices)
+
+    all_indices = set(range(60000))
+    all_verifier_indices_set = set(all_verifier_indices)
+    non_verifier_indices = list(all_indices - all_verifier_indices_set)
+
+    images, labels = load_data_from_indices(non_verifier_indices, root=MNIST_ROOT_FW, train=True, download=True)
+    
+    non_verifier_indices_dict = {}
+    for digit in range(10):
+        non_verifier_indices_dict[f"{digit}"] = []
+    for i, label in enumerate(labels):
+        non_verifier_indices_dict[f"{label}"].append(non_verifier_indices[i])
+
+    return non_verifier_indices_dict
 
 def get_features_for_folder(model, folder_path, batch_size=32, num_workers=4, device='cpu'):
     """
@@ -108,19 +131,19 @@ def get_features_for_folder(model, folder_path, batch_size=32, num_workers=4, de
     return torch.cat(features_list, dim=0)
 
 # Have to sample from the verifier data to get the features to have same number as the generated samples
-def get_features_for_verifier_indices(model, num_generated_samples, verifier_indices, batch_size=32, num_workers=4, device='cpu'):
+def get_features_for_specific_indices(model, num_generated_samples, specific_indices, batch_size=32, num_workers=4, device='cpu'):
     """
     Get penultimate features for specific verifier indices.
     """
     
-    verifier_images, verifier_labels = load_data_from_indices(verifier_indices, root=MNIST_ROOT_FW, train=True, download=True)
+    specific_images, specific_labels = load_data_from_indices(specific_indices, root=MNIST_ROOT_FW, train=True, download=True)
 
     # Randomly sample num_generated_samples indices from the verifier set
-    total = len(verifier_images)
+    total = len(specific_images)
     sample_indices = random.sample(range(total), num_generated_samples)
 
-    sampled_images = [verifier_images[i] for i in sample_indices]
-    sampled_labels = [verifier_labels[i] for i in sample_indices]
+    sampled_images = [specific_images[i] for i in sample_indices]
+    sampled_labels = [specific_labels[i] for i in sample_indices]
 
     # Normalize and reshape
     to_tensor = transforms.ToTensor()
@@ -131,14 +154,14 @@ def get_features_for_verifier_indices(model, num_generated_samples, verifier_ind
     sampled_labels = torch.tensor(sampled_labels)
 
     # Create DataLoader
-    verifier_dataset = torch.utils.data.TensorDataset(sampled_normalized_verifier_images, sampled_labels)
-    verifier_loader = DataLoader(verifier_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    specific_dataset = torch.utils.data.TensorDataset(sampled_normalized_verifier_images, sampled_labels)
+    specific_loader = DataLoader(specific_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     model.eval()
     features_list = []
 
     with torch.no_grad():
-        for x_batch, _ in verifier_loader:
+        for x_batch, _ in specific_loader:
             x_batch = x_batch.to(device)
             feats = model.features(x_batch)  # or use get_penultimate_features(model, x_batch)
             features_list.append(feats.cpu())
@@ -167,7 +190,7 @@ def frechet_distance(x_a, x_b):
     fd = np.sum(diff**2) + np.trace(sigma_a + sigma_b - 2.0*covmean)
     return fd
 
-def compute_fid_score(fid_model_location, num_generated_samples, generated_results_dir, verifier_indices, device='cpu'):
+def compute_fid_score(fid_model_location, num_times_compute_fid, num_generated_samples, generated_results_dir, verifier_indices, non_verifier_indices, device='cpu'):
     
     model = Classifier()
 
@@ -181,25 +204,46 @@ def compute_fid_score(fid_model_location, num_generated_samples, generated_resul
     # Get the features for the generated samples
     generated_features = get_features_for_folder(model, generated_results_dir, device=device)
     
-    # Get the features for the verifier samples
-    verifier_features = get_features_for_verifier_indices(model, num_generated_samples, verifier_indices, device=device)
+    # Take samples num_times_compute_fid times
+    total_against_verifier_data_fid = 0
+    total_against_non_verifier_data_fid = 0
+    all_measured_against_verifier_data_fids = []
+    all_measured_against_non_verifier_data_fids = []
+    for i in range(num_times_compute_fid):
+        # Get the features for the verifier samples
+        verifier_features = get_features_for_specific_indices(model, num_generated_samples, verifier_indices, device=device)
 
-    fid = frechet_distance(generated_features.cpu().numpy(), 
-                           verifier_features.cpu().numpy())
+        # Get the features for the non-verifier samples
+        non_verifier_features = get_features_for_specific_indices(model, num_generated_samples, non_verifier_indices, device=device)
 
-    return fid
+        against_verifier_data_fid = frechet_distance(generated_features.cpu().numpy(), 
+                            verifier_features.cpu().numpy())
+        
+        against_non_verifier_data_fid = frechet_distance(generated_features.cpu().numpy(),
+                            non_verifier_features.cpu().numpy())
+        
+        total_against_verifier_data_fid += against_verifier_data_fid
+        total_against_non_verifier_data_fid += against_non_verifier_data_fid
+        all_measured_against_verifier_data_fids.append(against_verifier_data_fid)
+        all_measured_against_non_verifier_data_fids.append(against_non_verifier_data_fid)
+
+    # Compute the mean FID score
+    mean_against_verifier_data_fid = total_against_verifier_data_fid / num_times_compute_fid
+    mean_against_non_verifier_data_fid = total_against_non_verifier_data_fid / num_times_compute_fid
+
+    return mean_against_verifier_data_fid, mean_against_non_verifier_data_fid, all_measured_against_verifier_data_fids, all_measured_against_non_verifier_data_fids
 
 def main():
 
     # Main settings
     subset_size = 400
-    n_samples = 2 #50
+    n_samples = 50
 
     # Configurations
     digit_array = list(range(10))
     delta_f = 100
     delta_b = 200
-    n_candidates_paths = 2 #5
+    n_candidates_paths = 5
     ema=True
     use_clip=True
     scoring_approach = "mse"
@@ -238,13 +282,9 @@ def main():
     ### Save generated samples and verifier indices ###
     verifier_indices_dict_path = os.path.join(generalization_experiment_results_dir, "verifier_indices.json")
     
-    '''
     verifier_indices_dict = {}
     # Loop through digits
     for digit in digit_array:
-
-        if digit > 1:
-            break
 
         # Get the normalized generated samples and verifier samples
         digit_samples, verifier_indices = normalized_generate_images_and_get_verifier_indices(
@@ -277,8 +317,7 @@ def main():
             img_pil.save(os.path.join(save_dir, f"generated_sample_{i}.png"))
 
     with open(verifier_indices_dict_path, 'w') as f:
-        json.dump(verifier_indices_dict, f)'
-    '''
+        json.dump(verifier_indices_dict, f)
 
     ### Compute FID Score ###
     # Get FID model location
@@ -288,25 +327,51 @@ def main():
     with open(verifier_indices_dict_path, 'r') as f:
         verifier_indices_dict = json.load(f)
 
+    # Get non-verifier indices
+    non_verifier_indices_dict = get_non_verifier_indices_dict(verifier_indices_dict)
+
+    # Save non-verifier indices
+    non_verifier_indices_dict_path = os.path.join(generalization_experiment_results_dir, "non_verifier_indices.json")
+    with open(non_verifier_indices_dict_path, 'w') as f:
+        json.dump(non_verifier_indices_dict, f)
+
+    num_times_compute_fid = 30
+
+    fid_score_dict = {}
+
     # Loop through digits
     for digit in digit_array:
 
-        if digit > 1:
-            break
-
         verifier_indices = verifier_indices_dict[f"{digit}"]
-        generated_sampels_dir = os.path.join(generalization_experiment_results_dir, f"digit_{digit}_generated_samples")
+        non_verifier_indices = non_verifier_indices_dict[f"{digit}"]
+        generated_samples_dir = os.path.join(generalization_experiment_results_dir, f"digit_{digit}_generated_samples")
 
         # Compute FID Score
-        fid_score = compute_fid_score(
+        against_verifier_data_fid, against_non_verifier_data_fid, all_measured_against_verifier_data_fids, all_measured_against_non_verifier_data_fids = compute_fid_score(
             fid_model_location=fid_model_location,
+            num_times_compute_fid=num_times_compute_fid,
             num_generated_samples=n_samples,
-            generated_results_dir=generated_sampels_dir,
+            generated_results_dir=generated_samples_dir,
             verifier_indices=verifier_indices,
+            non_verifier_indices=non_verifier_indices,
             device=device
         )
 
-        print(f"FID Score for digit {digit}: {fid_score}")
+        print(f"Against Verifier Data FID Score for digit {digit}: {against_verifier_data_fid}")
+        print(f"Against Non-Verifier Data FID Score for digit {digit}: {against_non_verifier_data_fid}")
+
+        fid_score_dict[digit] = {
+            "mean fid score against verifier data": against_verifier_data_fid,
+            "mean fid score against non-verifier data": against_non_verifier_data_fid,
+            "all measured against verifier data fids": all_measured_against_verifier_data_fids,
+            "all measured against non-verifier data fids": all_measured_against_non_verifier_data_fids
+        }
+
+    # Save FID score dict to json
+    fid_score_dict_path = os.path.join(generalization_experiment_results_dir, "fid_scores.json")
+    with open(fid_score_dict_path, 'w') as f:
+        json.dump(fid_score_dict, f, indent=4)
+    print(f"FID scores saved to {fid_score_dict_path}")
 
 if __name__ == '__main__':
     main()
