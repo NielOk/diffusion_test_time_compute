@@ -8,6 +8,8 @@ import os
 import sys
 import datetime
 import json
+import random
+import scipy
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset, Dataset
@@ -105,23 +107,31 @@ def get_features_for_folder(model, folder_path, batch_size=32, num_workers=4, de
 
     return torch.cat(features_list, dim=0)
 
-def get_features_for_verifier_indices(model, verifier_indices, batch_size=32, num_workers=4, device='cpu'):
+# Have to sample from the verifier data to get the features to have same number as the generated samples
+def get_features_for_verifier_indices(model, num_generated_samples, verifier_indices, batch_size=32, num_workers=4, device='cpu'):
     """
     Get penultimate features for specific verifier indices.
     """
     
     verifier_images, verifier_labels = load_data_from_indices(verifier_indices, root=MNIST_ROOT_FW, train=True, download=True)
 
+    # Randomly sample num_generated_samples indices from the verifier set
+    total = len(verifier_images)
+    sample_indices = random.sample(range(total), num_generated_samples)
+
+    sampled_images = [verifier_images[i] for i in sample_indices]
+    sampled_labels = [verifier_labels[i] for i in sample_indices]
+
     # Normalize and reshape
     to_tensor = transforms.ToTensor()
-    normalized_verifier_images = torch.stack([
-        2.0 * (transforms.ToTensor()(img) - 0.5) for img in verifier_images
+    sampled_normalized_verifier_images = torch.stack([
+        2.0 * (transforms.ToTensor()(img) - 0.5) for img in sampled_images
     ])
 
-    verifier_labels = torch.tensor(verifier_labels)
+    sampled_labels = torch.tensor(sampled_labels)
 
     # Create DataLoader
-    verifier_dataset = torch.utils.data.TensorDataset(normalized_verifier_images, verifier_labels)
+    verifier_dataset = torch.utils.data.TensorDataset(sampled_normalized_verifier_images, sampled_labels)
     verifier_loader = DataLoader(verifier_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     model.eval()
@@ -135,7 +145,29 @@ def get_features_for_verifier_indices(model, verifier_indices, batch_size=32, nu
 
     return torch.cat(features_list, dim=0)
 
-def compute_fid_score(fid_model_location, generated_results_dir, verifier_indices, device='cpu'):
+# Freched distance function
+def frechet_distance(x_a, x_b):
+    """
+    Compute Fréchet distance between two sets of vectors x_a, x_b
+    x_a shape => (N, d)
+    x_b shape => (M, d)
+    """
+    mu_a    = np.mean(x_a, axis=0)
+    sigma_a = np.cov(x_a.T)
+    mu_b    = np.mean(x_b, axis=0)
+    sigma_b = np.cov(x_b.T)
+
+    diff = mu_a - mu_b
+    # sqrtm can yield complex values if the covariance matrices are nearly singular.
+    covmean, _ = scipy.linalg.sqrtm(sigma_a @ sigma_b, disp=False)
+    # If there is a tiny imaginary component, just drop it.
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+
+    fd = np.sum(diff**2) + np.trace(sigma_a + sigma_b - 2.0*covmean)
+    return fd
+
+def compute_fid_score(fid_model_location, num_generated_samples, generated_results_dir, verifier_indices, device='cpu'):
     
     model = Classifier()
 
@@ -150,10 +182,12 @@ def compute_fid_score(fid_model_location, generated_results_dir, verifier_indice
     generated_features = get_features_for_folder(model, generated_results_dir, device=device)
     
     # Get the features for the verifier samples
-    verifier_features = get_features_for_verifier_indices(model, verifier_indices, device=device)
+    verifier_features = get_features_for_verifier_indices(model, num_generated_samples, verifier_indices, device=device)
 
+    fid = frechet_distance(generated_features.cpu().numpy(), 
+                           verifier_features.cpu().numpy())
 
-
+    return fid
 
 def main():
 
@@ -204,6 +238,7 @@ def main():
     ### Save generated samples and verifier indices ###
     verifier_indices_dict_path = os.path.join(generalization_experiment_results_dir, "verifier_indices.json")
     
+    '''
     verifier_indices_dict = {}
     # Loop through digits
     for digit in digit_array:
@@ -242,7 +277,8 @@ def main():
             img_pil.save(os.path.join(save_dir, f"generated_sample_{i}.png"))
 
     with open(verifier_indices_dict_path, 'w') as f:
-        json.dump(verifier_indices_dict, f)
+        json.dump(verifier_indices_dict, f)'
+    '''
 
     ### Compute FID Score ###
     # Get FID model location
@@ -254,18 +290,23 @@ def main():
 
     # Loop through digits
     for digit in digit_array:
+
+        if digit > 1:
+            break
+
         verifier_indices = verifier_indices_dict[f"{digit}"]
         generated_sampels_dir = os.path.join(generalization_experiment_results_dir, f"digit_{digit}_generated_samples")
 
         # Compute FID Score
         fid_score = compute_fid_score(
             fid_model_location=fid_model_location,
+            num_generated_samples=n_samples,
             generated_results_dir=generated_sampels_dir,
             verifier_indices=verifier_indices,
             device=device
         )
 
+        print(f"FID Score for digit {digit}: {fid_score}")
 
-    
 if __name__ == '__main__':
     main()
