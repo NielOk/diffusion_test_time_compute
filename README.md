@@ -1,2 +1,6 @@
 # diffusion_test_time_compute
 TL;DR: We adapted DeepMind’s inference-scaling framework—originally designed for deterministic ODE-based diffusion models—to work with stochastic DDPMs. To enable test-time conditioning, we developed a custom verifier that leverages small subsets of labeled training examples, allowing us to guide an unconditioned model at inference. Despite limited compute resources, we successfully validated our approach on MNIST, demonstrating that minimal labeled data can effectively steer generative outputs. Moving forward, we aim to extend this framework to larger, more complex datasets and explore its application in robotics diffusion policies.
+
+The future_generalization_experiment directory has an example of a generalization test we would like to run in the future with more complex datasets. This experiment would basically tell us if an image better fits the distribution of images used in the verifier or the overall distribution of images used for training the diffusion model.
+
+To the best of our knowledge, this is the first-ever implementation of and research on inference scaling via noise-space search applied to stochastic diffusion models.
