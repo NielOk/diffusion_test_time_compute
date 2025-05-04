@@ -146,7 +146,7 @@
   <div class="entry-category">Trajectory Space Search Theory</div>
 
   <div class="entry-content">
-    <p>This addendum formalizes trajectory space search theory in stochastic diffusion models. The key idea is to shift the search domain from noise space to trajectory space as we move from deterministic diffusers (under DeepMind's framework) to stochastic ones, potentially enabling more expressive and controllable inference.</p>
+    <p>This addendum formalizes trajectory space search theory in stochastic diffusion models. The key idea is to shift the search domain from noise space to trajectory space as we move from deterministic diffusers (under DeepMind's framework) to stochastic ones, potentially enabling more expressive inference.</p>
 
     <p><strong>1. Definitions</strong></p>
     <ul>
@@ -178,18 +178,34 @@
     \Pi = \{ \epsilon_T, \epsilon_{T-1}, \ldots, \epsilon_1 \}
     \]</p>
 
-    <p><strong>5. Expressivity and Controllability</strong></p>
-    <p>Define controllability of the output as:</p>
-    <p>\[
-    \mathcal{C}(f, \Pi) := \sup_{\pi \in \Pi} f(\pi) - \inf_{\pi \in \Pi} f(\pi)
-    \]</p>
-    <p>This quantifies how much influence we have over outcomes by optimizing over noise paths. Compare this to controlling only \( x_T \):</p>
-    <p>\[
-    \mathcal{C}(f, \Pi) \gg \mathcal{C}(f, \mathcal{T}(x_T))
-    \]</p>
+    <p><strong>5. Expressivity Through Trajectory Search</strong></p>
+    <p>
+      In stochastic diffusion models, the outcome distribution is already high-variance due to noise injected at each step. But variance alone doesn’t imply structure or direction. Trajectory space search reframes generation not as random sampling, but as a search problem over entire denoising paths.
+    </p>
+    <p>
+      Let \( f(\pi) \) be a task-aligned score of a trajectory \( \pi \), such as realism, reward, or semantic alignment. Define the range of achievable scores when searching over full noise paths \( \Pi = \{\epsilon_T, \ldots, \epsilon_1\} \) as:
+    </p>
+    <div>
+    \[
+    \mathcal{R}(f, \Pi) := \sup_{\pi \in \Pi} f(\pi) - \inf_{\pi \in \Pi} f(\pi)
+    \]
+    </div>
+    <p>
+      Compare this to the narrower set of outputs reachable when only varying the initial noise \( x_T \), and letting the reverse process run stochastically:
+    </p>
+    <div>
+    \[
+    \mathcal{R}(f, \Pi) \gg \mathcal{R}(f, \mathcal{T}(x_T))
+    \]
+    </div>
+    <p>
+      In other words, trajectory space offers a broader and more navigable landscape of possible generations. While both methods sample from the same underlying stochastic process, trajectory search treats inference as a deliberate exploration of denoising paths rather than a one-shot roll from a prior.
+    </p>
 
     <p><strong>Interpretation</strong></p>
-    <p>This theory reframes generative search not as one-shot sampling from a magic prior, but as dynamic control through denoising space. In diffusion models where randomness accumulates at each step, control and intelligence reside not in the starting point, but in the trajectory taken through a probabilistic process.</p>
+    <p>
+      This theory reframes generative inference in diffusion models as a structured search over stochastic trajectories. Since randomness accumulates at every step, the final output depends not just on the starting point \( x_T \), but on the full sequence of noise injections that guide the process. By optimizing over these noise trajectories, we expose a richer set of candidate generations — enabling more expressive and reliable sampling without changing the model itself. This trades off increased compute for better inference, not through control, but through deeper search.
+    </p>
   </div>
 </body>
 </html>
