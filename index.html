@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scaling Inference Compute for DDPMs</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background-color: #fcfcfc;
+      color: #2c2c2c;
+      line-height: 1.6;
+      margin: 0;
+      padding: 2rem;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.3rem;
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2rem;
+    }
+    .authors {
+      font-size: 1rem;
+      color: #555;
+    }
+    iframe {
+      width: 100%;
+      height: 700px;
+      border: 1px solid #ccc;
+      margin-bottom: 3rem;
+    }
+    .entry-date {
+      font-size: 0.9rem;
+      color: #777;
+    }
+    .entry-category {
+      font-weight: bold;
+      color: #444;
+      margin-bottom: 1rem;
+    }
+    ul {
+      padding-left: 1.5rem;
+    }
+    code {
+      background-color: #f2f2f2;
+      padding: 2px 4px;
+      font-family: monospace;
+      font-size: 0.95em;
+    }
+  </style>
+
+  <!-- MathJax for LaTeX rendering -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+<body>
+  <div class="header">
+    <h1>Scaling Inference Compute for Denoising Diffusion Probabilistic Models</h1>
+    <div class="authors">
+      Niel Ok, Hemal Arora, Siya Goel<br />
+      Stanford University · March 2025
+    </div>
+  </div>
+
+  <iframe src="Scaling Inference Compute for Denoising Diffusion Probabolistic Models.pdf"></iframe>
+
+  <h2>Addendum: Trajectory Space Search Theory (from Niel's Blog)</h2>
+  <div class="entry-date">May 2, 2025</div>
+  <div class="entry-category">Trajectory Space Search Theory</div>
+
+  <div class="entry-content">
+    <p>This addendum formalizes trajectory space search theory in stochastic diffusion models. The key idea is to shift the search domain from noise space to trajectory space as we move from deterministic diffusers (under DeepMind's framework) to stochastic ones, potentially enabling more expressive and controllable inference.</p>
+
+    <p><strong>1. Definitions</strong></p>
+    <ul>
+      <li>\( \mathcal{X} \): data space (e.g., images, text sequences)</li>
+      <li>\( x_T \sim p_T(x) \): initial noise drawn from a base Gaussian distribution</li>
+      <li>\( x_t \): sample at diffusion step \( t \) (from \( T \) to 0)</li>
+      <li>\( \pi = \{x_T, x_{T-1}, \ldots, x_0\} \): a full denoising trajectory</li>
+      <li>\( \pi(x_T) \): a trajectory sampled from the default reverse process starting at \( x_T \)</li>
+      <li>\( \mathcal{T}(x_T) \): set of all possible trajectories starting at \( x_T \)</li>
+      <li>\( f(\pi) \): objective function scoring the final output \( x_0 \)</li>
+    </ul>
+
+    <p><strong>2. DeepMind's Framing: Noise Space Search</strong></p>
+    <p>Optimize over \( x_T \) to maximize final sample quality via the diffusion model:</p>
+    <p>\[
+    x_T^\ast = \arg\max_{x_T} f(\pi(x_T))
+    \]</p>
+    <p>But this assumes a deterministic or injective mapping from \( x_T \to x_0 \), which fails in stochastic denoising models.</p>
+
+    <p><strong>3. Proposed Framing: Trajectory Space Search</strong></p>
+    <p>Instead, treat the full denoising trajectory \( \pi \) as the search object:</p>
+    <p>\[
+    \pi^\ast = \arg\max_{\pi \in \mathcal{T}} f(\pi)
+    \]</p>
+
+    <p><strong>4. Degrees of Freedom</strong></p>
+    <p>Let each transition step \( x_{t-1} \sim p_\theta(x_{t-1} \mid x_t, \epsilon_t) \) include a noise term \( \epsilon_t \). Then define the trajectory control space:</p>
+    <p>\[
+    \Pi = \{ \epsilon_T, \epsilon_{T-1}, \ldots, \epsilon_1 \}
+    \]</p>
+
+    <p><strong>5. Expressivity and Controllability</strong></p>
+    <p>Define controllability of the output as:</p>
+    <p>\[
+    \mathcal{C}(f, \Pi) := \sup_{\pi \in \Pi} f(\pi) - \inf_{\pi \in \Pi} f(\pi)
+    \]</p>
+    <p>This quantifies how much influence we have over outcomes by optimizing over noise paths. Compare this to controlling only \( x_T \):</p>
+    <p>\[
+    \mathcal{C}(f, \Pi) \gg \mathcal{C}(f, \mathcal{T}(x_T))
+    \]</p>
+
+    <p><strong>Interpretation</strong></p>
+    <p>This theory reframes generative search not as one-shot sampling from a magic prior, but as dynamic control through denoising space. In diffusion models where randomness accumulates at each step, control and intelligence reside not in the starting point, but in the trajectory taken through a probabilistic process.</p>
+  </div>
+</body>
+</html>
