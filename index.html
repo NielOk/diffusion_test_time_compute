@@ -98,31 +98,30 @@
       font-weight: bold;
       display: inline-block;
     }
-    .github-button {
+        .github-button {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
       background-color: #000;
-      color: #fff;
+      color: #fff !important; /* Force white text */
       padding: 0.5rem 0.9rem;
       font-size: 0.9rem;
       border-radius: 1.5rem;
       font-weight: bold;
-      text-decoration: none;
       text-decoration: none !important;
       margin-top: 0.5rem;
       transition: background-color 0.2s ease;
     }
 
+    .github-button:link,
     .github-button:visited,
-    .github-button:active,
+    .github-button:hover,
     .github-button:focus,
-    .github-button:hover {
-      color: #fff;
-      text-decoration: none;
+    .github-button:active {
+      color: #fff !important;
+      text-decoration: none !important;
       background-color: #333;
     }
-
     .github-icon {
       vertical-align: middle;
     }
