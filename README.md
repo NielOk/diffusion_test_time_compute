@@ -8,8 +8,8 @@ To the best of our knowledge, this is the first-ever implementation of and resea
 -----------------------------------------------------------------------------------------------------------------------------------------------
 Directory Configuration:
 * main_experiments/ - Code and classifier models used for experiments in the paper.
-* lc_gpu_accelerated_training/ - Code to train label-conditioned diffusion model for MNIST on a GPU.
-* nlc_gpu_accelerated_training/ - Code to train non-label-conditioned diffusion model for MNIST on a GPU.
+* lc_gpu_accelerated_training/ - Code to train label-conditioned diffusion model for MNIST on a GPU. .env with lambda ssh key and api key required in main repo dir. 
+* nlc_gpu_accelerated_training/ - Code to train non-label-conditioned diffusion model for MNIST on a GPU. .env with lambda ssh key and api key required in main repo dir. 
 * inference_experiments/ - Production grade code with utils, refactored from main_experiments for folks who want more generalized code.
 * model_tests/ - Basic model tests conducted in prepration for larger experiments. 
 * future_generalization_experiment/ - Code for experiments we would like to perform on larger datasets and models.
