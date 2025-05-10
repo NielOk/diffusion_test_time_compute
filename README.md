@@ -3,7 +3,7 @@ TL;DR: We present a novel framework for inference scaling in stochastic diffusio
 
 The future_generalization_experiment directory contains a prototype to evaluate the discriminative power of the verifier across domains.
 
-To the best of our knowledge, this is the first-ever implementation of and research on inference scaling via denoising trajectory space search applied to stochastic diffusion models.
+To the best of our knowledge, this is the first empirical and theoretical instantiation of trajectory space inference scaling for stochastic diffusion models.
 
 -----------------------------------------------------------------------------------------------------------------------------------------------
 Directory Configuration:
