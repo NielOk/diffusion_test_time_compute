@@ -5,6 +5,8 @@ The future_generalization_experiment directory contains a prototype to evaluate 
 
 To the best of our knowledge, this is the first empirical and theoretical instantiation of trajectory space inference scaling for stochastic diffusion models.
 
+We gratefully acknowledge compute support provided by researchers at DeepMind
+
 -----------------------------------------------------------------------------------------------------------------------------------------------
 Directory Configuration:
 * main_experiments/ - Code and classifier models used for experiments in the paper.
